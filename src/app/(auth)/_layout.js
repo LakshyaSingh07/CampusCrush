@@ -4,7 +4,7 @@ export default function AuthLayout() {
   return (
     <Stack>
       <Stack.Screen name="sign-in" options={{ headerShown: false }} />
-      <Stack.Screen name="verify-otp" options={{ title: "Verify Email" }} />
+      <Stack.Screen name="verify-otp" options={{ headerShown: false }} />
     </Stack>
   );
 }

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 const AuthContext = createContext({});
@@ -10,34 +10,39 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for an active session when the provider mounts
-    const fetchSession = async () => {
-      console.log("AuthProvider: Attempting to fetch session from storage...");
+    const fetchAndValidateSession = async () => {
+      setLoading(true);
+      console.log("AuthProvider: Validating session with server...");
+
+      // This call checks with the server if the user for the local session is still valid.
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      // We still get the session from local storage.
       const {
         data: { session },
       } = await supabase.auth.getSession();
+
+      // Only set the session in our app state if the user is confirmed to be valid by the server.
+      // If the user was deleted, 'user' will be null, and therefore 'session' will be set to null.
+      setSession(user ? session : null);
       console.log(
-        "AuthProvider: Session fetched on startup:",
-        session ? "SESSION FOUND" : "NO SESSION"
+        "AuthProvider: Validation complete.",
+        user ? "USER VALID" : "USER INVALID/DELETED"
       );
-      setSession(session);
       setLoading(false);
     };
 
-    fetchSession();
+    fetchAndValidateSession();
 
-    // Listen for auth state changes (SIGNED_IN, SIGNED_OUT, etc.)
+    // The onAuthStateChange listener remains the same, it handles live changes like login/logout.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log(
-        `AuthProvider: Auth state changed! Event: ${_event}`,
-        session ? "SESSION FOUND" : "NO SESSION"
-      );
       setSession(session);
     });
 
-    // Cleanup the subscription when the component unmounts
     return () => subscription.unsubscribe();
   }, []);
 

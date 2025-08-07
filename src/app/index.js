@@ -1,16 +1,16 @@
-import React, { useEffect } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  Pressable,
-  ImageBackground,
-  SafeAreaView,
-  ActivityIndicator,
-} from "react-native";
-import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { useEffect } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  ImageBackground,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useAuth } from "../context/AuthProvider";
 
 export default function WelcomeScreen() {
@@ -38,6 +38,13 @@ export default function WelcomeScreen() {
     );
   }
 
+  // NEW: If loading is done AND we have a session, render nothing.
+  // This prevents the flicker while the router.replace() in the useEffect
+  // is navigating the user away.
+  if (session) {
+    return null;
+  }
+
   // If we are done loading and there is NO session, show the full welcome UI.
   return (
     <ImageBackground
@@ -46,10 +53,7 @@ export default function WelcomeScreen() {
     >
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <Image
-            source={require("../assets/logo.png")}
-            style={styles.logo}
-          />
+          <Image source={require("../assets/logo.png")} style={styles.logo} />
           <Text style={styles.title}>Welcome to CampusCrush</Text>
           <Text style={styles.subtitle}>Find your connection on campus.</Text>
         </View>

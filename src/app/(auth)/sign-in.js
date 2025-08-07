@@ -2,6 +2,7 @@ import { FontAwesome5 } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Easing,
   Keyboard,
@@ -12,7 +13,6 @@ import {
   Text,
   TextInput, TouchableWithoutFeedback, View
 } from "react-native";
-import { ActivityIndicator } from "react-native-web";
 import CustomAlert from "../../components/CustomAlert";
 import { supabase } from "../../lib/supabase";
 
