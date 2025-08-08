@@ -1,117 +1,3 @@
-// import { createContext, useContext, useEffect, useState } from "react";
-// import { supabase } from "../lib/supabase";
-
-// const AuthContext = createContext({});
-
-// export const useAuth = () => useContext(AuthContext);
-
-// export const AuthProvider = ({ children }) => {
-//   const [session, setSession] = useState(null);
-//   const [loading, setLoading] = useState(true);
-
-//   useEffect(() => {
-//     const fetchAndValidateSession = async () => {
-//       setLoading(true);
-//       console.log("AuthProvider: Validating session with server...");
-
-//       // This call checks with the server if the user for the local session is still valid.
-//       const {
-//         data: { user },
-//       } = await supabase.auth.getUser();
-
-//       // We still get the session from local storage.
-//       const {
-//         data: { session },
-//       } = await supabase.auth.getSession();
-
-//       // Only set the session in our app state if the user is confirmed to be valid by the server.
-//       // If the user was deleted, 'user' will be null, and therefore 'session' will be set to null.
-//       setSession(user ? session : null);
-//       console.log(
-//         "AuthProvider: Validation complete.",
-//         user ? "USER VALID" : "USER INVALID/DELETED"
-//       );
-//       setLoading(false);
-//     };
-
-//     fetchAndValidateSession();
-
-//     // The onAuthStateChange listener remains the same, it handles live changes like login/logout.
-//     const {
-//       data: { subscription },
-//     } = supabase.auth.onAuthStateChange((_event, session) => {
-//       setSession(session);
-//     });
-
-//     return () => subscription.unsubscribe();
-//   }, []);
-
-//   return (
-//     <AuthContext.Provider value={{ session, loading }}>
-//       {children}
-//     </AuthContext.Provider>
-//   );
-// };
-
-// import { createContext, useContext, useEffect, useState } from "react";
-// import { supabase } from "../lib/supabase";
-
-// const AuthContext = createContext({});
-
-// export const useAuth = () => useContext(AuthContext);
-
-// export const AuthProvider = ({ children }) => {
-//   const [session, setSession] = useState(null);
-//   const [profile, setProfile] = useState(null); // NEW: State for the profile
-//   const [loading, setLoading] = useState(true);
-
-//   useEffect(() => {
-//     const fetchInitialData = async () => {
-//       // First, get the session from local storage
-//       const {
-//         data: { session: currentSession },
-//       } = await supabase.auth.getSession();
-//       setSession(currentSession);
-
-//       // If there's a session, fetch the associated profile
-//       if (currentSession) {
-//         const { data: userProfile } = await supabase
-//           .from("profiles")
-//           .select("*")
-//           .eq("user_id", currentSession.user.id)
-//           .single();
-//         setProfile(userProfile);
-//       }
-//       setLoading(false);
-//     };
-
-//     fetchInitialData();
-
-//     // Listen for auth state changes
-//     const {
-//       data: { subscription },
-//     } = supabase.auth.onAuthStateChange(async (_event, session) => {
-//       setSession(session);
-//       // If user logs out, clear their profile data
-//       if (!session) {
-//         setProfile(null);
-//       }
-//     });
-
-//     return () => subscription.unsubscribe();
-//   }, []);
-
-//   const value = {
-//     session,
-//     profile,
-//     loading,
-//     // Exposing the raw user object can also be useful
-//     user: session?.user,
-//   };
-
-//   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-// };
-
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
@@ -121,46 +7,89 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
-  const [profile, setProfile] = useState(null); // State for the profile
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchInitialData = async () => {
-      // Get the current session from local storage
+    // DEBUG: Log when the provider first mounts.
+    console.log("--- AuthProvider Mounted: Starting initial auth check. ---");
+
+    const fetchAndValidateSession = async () => {
+      setLoading(true);
+
+      // DEBUG: Log before checking the server.
+      console.log("1. Validating session with Supabase server...");
       const {
-        data: { session: currentSession },
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      // DEBUG: Log the result from the server check.
+      console.log(
+        "2. Server check complete. User object:",
+        user
+          ? `Exists (ID: ${user.id})`
+          : "null (User deleted or not logged in)"
+      );
+
+      const {
+        data: { session: localSession },
       } = await supabase.auth.getSession();
+
+      const currentSession = user ? localSession : null;
       setSession(currentSession);
 
-      // If a session exists, fetch the user's profile data
       if (currentSession) {
-        const { data: userProfile } = await supabase
+        // DEBUG: Log before fetching the user's profile.
+        console.log("3. Session is valid, fetching profile from database...");
+        const { data: userProfile, error: profileError } = await supabase
           .from("profiles")
-          .select("*") // Select all columns
+          .select("*")
           .eq("user_id", currentSession.user.id)
           .single();
+
+        if (profileError) {
+          console.error("DEBUG: Error fetching profile:", profileError.message);
+        } else {
+          // DEBUG: Log the profile data that was fetched.
+          console.log(
+            "4. Profile fetched:",
+            userProfile ? `Name: ${userProfile.full_name}` : "No profile found."
+          );
+        }
         setProfile(userProfile);
       }
+
+      // DEBUG: Log when the entire initial process is finished.
+      console.log("5. Initial data fetch complete. App is ready.");
       setLoading(false);
     };
 
-    fetchInitialData();
+    fetchAndValidateSession();
 
-    // Listen for auth state changes (login/logout)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      // DEBUG: Log any live authentication changes (login, logout, etc.).
+      console.log(
+        `--- Auth State Changed --- Event: ${_event}`,
+        session ? "New session created." : "Session destroyed."
+      );
       setSession(session);
-      // Clear profile data on logout
       if (!session) {
         setProfile(null);
+      } else {
+        const { data: userProfile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("user_id", session.user.id)
+          .single();
+        setProfile(userProfile);
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Make the profile available to the whole app
   const value = {
     session,
     profile,

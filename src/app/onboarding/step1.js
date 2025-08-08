@@ -12,6 +12,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import CustomAlert from "../../components/CustomAlert";
@@ -131,80 +132,86 @@ export default function OnboardingStep1() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Progress Bar */}
-      <View style={styles.progressContainer}>
-        <View style={[styles.progressStep, styles.activeStep]} />
-        <View style={styles.progressStep} />
-        <View style={styles.progressStep} />
-        <View style={styles.progressStep} />
-      </View>
-
-      <Text style={styles.title}>Oh hey! Let's start with an intro.</Text>
-
-      {/* Form Fields */}
-      <View style={styles.form}>
-        <Text style={styles.label}>Your first name</Text>
-        <TextInput
-          style={styles.input}
-          value={firstName}
-          onChangeText={setFirstName}
-          returnKeyType="next"
-        />
-
-        <Text style={styles.label}>Your birthday</Text>
-        <View style={styles.birthdayContainer}>
-          <TextInput
-            style={styles.birthdayInput}
-            placeholder="Day"
-            keyboardType="number-pad"
-            maxLength={2}
-            value={day}
-            onChangeText={(text) => {
-              setDay(text);
-              if (text.length === 2) monthInput.current.focus();
-            }}
-            returnKeyType="next"
-          />
-          <TextInput
-            ref={monthInput}
-            style={styles.birthdayInput}
-            placeholder="Month"
-            keyboardType="number-pad"
-            maxLength={2}
-            value={month}
-            onChangeText={(text) => {
-              setMonth(text);
-              if (text.length === 2) yearInput.current.focus();
-            }}
-            returnKeyType="next"
-          />
-          <TextInput
-            ref={yearInput}
-            style={styles.birthdayInput}
-            placeholder="Year"
-            keyboardType="number-pad"
-            maxLength={4}
-            value={year}
-            onChangeText={setYear}
-          />
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <SafeAreaView style={styles.container}>
+        {/* Progress Bar */}
+        <View style={styles.progressContainer}>
+          <View style={[styles.progressStep, styles.activeStep]} />
+          <View style={styles.progressStep} />
+          <View style={styles.progressStep} />
+          <View style={styles.progressStep} />
         </View>
-        <Text style={styles.birthdayHint}>
-          It's never too early to count down
-        </Text>
-      </View>
 
-      {/* Floating Action Button */}
-      <Pressable style={styles.fab} onPress={handleNext} disabled={loading}>
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <FontAwesome5 name="arrow-right" size={20} color="#fff" />
-        )}
-      </Pressable>
+        <Text style={styles.title}>Oh hey! Let's start with an intro.</Text>
 
-      <CustomAlert {...alert} />
-    </SafeAreaView>
+        {/* Form Fields */}
+        <View style={styles.form}>
+          <Text style={styles.label}>Your first name</Text>
+          <TextInput
+            style={styles.input}
+            value={firstName}
+            onChangeText={setFirstName}
+            returnKeyType="next"
+          />
+
+          <Text style={styles.label}>Your birthday</Text>
+          <View style={styles.birthdayContainer}>
+            <TextInput
+              style={styles.birthdayInput}
+              placeholder="Day"
+              keyboardType="number-pad"
+              maxLength={2}
+              value={day}
+              onChangeText={(text) => {
+                setDay(text);
+                if (text.length === 2) monthInput.current.focus();
+              }}
+              returnKeyType="next"
+            />
+            <TextInput
+              ref={monthInput}
+              style={styles.birthdayInput}
+              placeholder="Month"
+              keyboardType="number-pad"
+              maxLength={2}
+              value={month}
+              onChangeText={(text) => {
+                setMonth(text);
+                if (text.length === 2) yearInput.current.focus();
+              }}
+              returnKeyType="next"
+            />
+            <TextInput
+              ref={yearInput}
+              style={styles.birthdayInput}
+              placeholder="Year"
+              keyboardType="number-pad"
+              maxLength={4}
+              value={year}
+              onChangeText={setYear}
+            />
+          </View>
+          <Text style={styles.birthdayHint}>
+            It's never too early to count down
+          </Text>
+        </View>
+
+        {/* Floating Action Button */}
+        <Animated.View
+          style={[styles.card, { transform: [{ translateY: cardTranslateY }] }]}
+        >
+          <Pressable style={styles.fab} onPress={handleNext} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <FontAwesome5 name="arrow-right" size={20} color="#fff" />
+            )}
+          </Pressable>
+        </Animated.View>
+
+        <CustomAlert {...alert} />
+      </SafeAreaView>
+    </TouchableWithoutFeedback>
   );
 }
 

@@ -151,11 +151,11 @@ export default function VerifyOTPScreen() {
             },
           ],
         });
-      } else {
+      } else if (data.user) {
         // On success, get the newly signed-in user's profile
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("full_name")
+          .select("full_name, birthday")
           .eq("user_id", data.user.id)
           .single();
 
@@ -183,7 +183,7 @@ export default function VerifyOTPScreen() {
         }
 
         // Check if the profile is complete
-        if (profile && profile.full_name) {
+        if (profile && profile.full_name && profile.birthday) {
           // If name exists, they are a returning user
           router.replace("/(tabs)/home");
         } else {
@@ -193,6 +193,18 @@ export default function VerifyOTPScreen() {
       }
     } catch (e) {
       // ... same catch block as before ...
+      setAlert({
+        visible: true,
+        title: "Error",
+        message: "An unexpected error occurred. Please try again.",
+        buttons: [
+          {
+            text: "OK",
+            onPress: () => setAlert(initialAlertState),
+            style: "primary",
+          },
+        ],
+      });
     } finally {
       setLoading(false);
     }
