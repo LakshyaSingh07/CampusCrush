@@ -15,40 +15,49 @@ import { useAuth } from "../context/AuthProvider";
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  // This hook gets the session and loading state from our AuthProvider
-  const { session, loading } = useAuth();
+  // Get session, loading, AND the new profile state
+  const { session, loading, profile } = useAuth();
 
-  // This is the important logic part from your old file, reimplemented.
-  // It runs after the component renders and whenever session or loading changes.
   useEffect(() => {
-    // If we are done loading and we have a session, the user is logged in.
-    if (!loading && session) {
-      // Instantly redirect them to the main part of the app.
-      router.replace("/(tabs)/home");
+    // If the provider is still loading data, do nothing yet.
+    if (loading) {
+      return;
     }
-  }, [session, loading]);
+
+    // --- NEW, SMARTER REDIRECT LOGIC ---
+    if (session) {
+      // User is logged in. Now, check if their profile is complete.
+      if (profile?.full_name && profile?.birthday) {
+        // Profile is complete, go to the main app.
+        router.replace("/(tabs)/home");
+      } else {
+        // Profile is NOT complete, send them to the correct onboarding step.
+        // We can add more checks here later for step2, step3 etc.
+        router.replace("/onboarding/step1");
+      }
+    }
+    // If there is no session, the useEffect does nothing, and the welcome screen will be shown.
+  }, [session, loading, profile]); // Add profile to the dependency array
 
   // While we check for a session, show a loading screen.
-  // This prevents the welcome screen from "flickering" for logged-in users.
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#7B61FF" />
       </View>
     );
   }
 
-  // NEW: If loading is done AND we have a session, render nothing.
-  // This prevents the flicker while the router.replace() in the useEffect
-  // is navigating the user away.
+  // This prevents the flicker. If a session exists, render nothing while the
+  // useEffect above handles the redirect.
   if (session) {
     return null;
   }
 
-  // If we are done loading and there is NO session, show the full welcome UI.
+  // If loading is done and there is NO session, show your beautiful UI.
   return (
     <ImageBackground
-      source={require("../assets/background-pattern.png")}
+      source={require("../assets/background-pattern.png")} // Check path
       style={styles.background}
     >
       <SafeAreaView style={styles.container}>
@@ -60,7 +69,6 @@ export default function WelcomeScreen() {
 
         <Pressable
           style={styles.button}
-          // If a new user clicks, send them to the sign-in flow.
           onPress={() => router.push("/(auth)/sign-in")}
         >
           <FontAwesome5 name="envelope" size={20} color="#fff" />

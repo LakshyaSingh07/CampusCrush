@@ -152,7 +152,44 @@ export default function VerifyOTPScreen() {
           ],
         });
       } else {
-        router.replace("/(tabs)/home");
+        // On success, get the newly signed-in user's profile
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("user_id", data.user.id)
+          .single();
+
+        // NEW: Add this line to debug the object we get back
+        console.log(
+          "DEBUG: Fetched profile object:",
+          JSON.stringify(profile, null, 2)
+        );
+
+        if (profileError) {
+          // Handle error fetching profile
+          setAlert({
+            visible: true,
+            title: "Error",
+            message: profileError.message,
+            buttons: [
+              {
+                text: "OK",
+                onPress: () => setAlert(initialAlertState),
+                style: "primary",
+              },
+            ],
+          });
+          return;
+        }
+
+        // Check if the profile is complete
+        if (profile && profile.full_name) {
+          // If name exists, they are a returning user
+          router.replace("/(tabs)/home");
+        } else {
+          // If name is null, they are a new user, send to onboarding
+          router.replace("/onboarding/step1");
+        }
       }
     } catch (e) {
       // ... same catch block as before ...
