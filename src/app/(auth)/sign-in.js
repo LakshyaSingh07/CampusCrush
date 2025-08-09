@@ -11,7 +11,9 @@ import {
   SafeAreaView,
   StyleSheet,
   Text,
-  TextInput, TouchableWithoutFeedback, View
+  TextInput,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 import CustomAlert from "../../components/CustomAlert";
 import { supabase } from "../../lib/supabase";

@@ -90,11 +90,39 @@ export const AuthProvider = ({ children }) => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // A function to update the profile in the database AND in the local state
+  const updateProfile = async (updates) => {
+    if (!session) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .update(updates)
+        .eq("user_id", session.user.id)
+        .select() // to get the updated row back
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        console.log("AuthProvider: Local profile state updated.", data);
+        setProfile(data);
+      }
+      return { data };
+    } catch (error) {
+      console.error("Error updating profile:", error.message);
+      return { error };
+    }
+  };
+
   const value = {
     session,
     profile,
     loading,
     user: session?.user,
+    updateProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

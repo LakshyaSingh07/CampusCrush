@@ -17,7 +17,6 @@ import {
 } from "react-native";
 import CustomAlert from "../../components/CustomAlert";
 import { useAuth } from "../../context/AuthProvider";
-import { supabase } from "../../lib/supabase";
 
 const initialAlertState = {
   visible: false,
@@ -28,7 +27,7 @@ const initialAlertState = {
 
 export default function OnboardingStep1() {
   const router = useRouter();
-  const { user } = useAuth(); // We'll need to update AuthProvider for this
+  const { user, updateProfile } = useAuth(); // We'll need to update AuthProvider for this
 
   const [firstName, setFirstName] = useState("");
   const [day, setDay] = useState("");
@@ -42,7 +41,7 @@ export default function OnboardingStep1() {
   const yearInput = useRef(null);
 
   const handleNext = async () => {
-    // Basic validation
+    // Basic validation remains the same
     if (!firstName.trim() || !day || !month || !year) {
       setAlert({
         visible: true,
@@ -60,43 +59,38 @@ export default function OnboardingStep1() {
     }
 
     const birthday = `${year}-${month}-${day}`;
-    // Add more robust date validation here if needed
+    // You can add more robust date validation here if needed
 
     setLoading(true);
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ full_name: firstName, birthday: birthday })
-        .eq("user_id", user.id);
 
-      // NEW: log for the error object
-      console.log("Supabase Update Error:", error);
+    // --- THIS IS THE UPDATED LOGIC ---
+    // Instead of calling Supabase directly, we call our new function.
+    const { error } = await updateProfile({
+      full_name: firstName,
+      birthday: birthday,
+    });
 
-      if (error) {
-        setAlert({
-          ...initialAlertState,
-          visible: true,
-          title: "Error",
-          message: error.message,
-          buttons: [
-            {
-              text: "OK",
-              onPress: () => setAlert(initialAlertState),
-              style: "primary",
-            },
-          ],
-        });
-      } else {
-        // Navigate to the next onboarding step
-        // For now, we'll just log it. Later, we'll go to step2.
-        console.log("Profile updated! Ready for step 2.");
-        // router.push('/onboarding/step2');
-      }
-    } catch (e) {
-      // ... catch block
-    } finally {
-      setLoading(false);
+    if (error) {
+      // If the update function returns an error, show it
+      setAlert({
+        visible: true,
+        title: "Error",
+        message: error.message,
+        buttons: [
+          {
+            text: "OK",
+            onPress: () => setAlert(initialAlertState),
+            style: "primary",
+          },
+        ],
+      });
+    } else {
+      // If successful, navigate to the next step
+      console.log("Profile updated! Ready for step 2.");
+      router.push("/onboarding/step2");
     }
+
+    setLoading(false);
   };
   const cardTranslateY = useRef(new Animated.Value(0)).current;
 
@@ -105,8 +99,8 @@ export default function OnboardingStep1() {
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
       (event) => {
         Animated.timing(cardTranslateY, {
-          toValue: -event.endCoordinates.height / 1.5, // Adjust this for how far up you want the card to move
-          duration: 300,
+          toValue: -event.endCoordinates.height / 1.1, // Adjust this for how far up you want the card to move
+          duration: 250,
           useNativeDriver: true,
           easing: Easing.inOut(Easing.ease),
         }).start();

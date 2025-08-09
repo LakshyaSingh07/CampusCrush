@@ -24,17 +24,28 @@ export default function WelcomeScreen() {
       return;
     }
 
-    // --- NEW, SMARTER REDIRECT LOGIC ---
+    // On refresh or cold start, gate access based on onboarding progress
     if (session) {
-      // User is logged in. Now, check if their profile is complete.
-      if (profile?.full_name && profile?.birthday) {
-        // Profile is complete, go to the main app.
-        router.replace("/(tabs)/home");
-      } else {
-        // Profile is NOT complete, send them to the correct onboarding step.
-        // We can add more checks here later for step2, step3 etc.
+      const hasStep1 = Boolean(profile?.full_name && profile?.birthday);
+      const hasStep2 = Boolean(profile?.department && profile?.grad_year);
+      const hasStep3 = Boolean(profile?.gender);
+
+      if (!hasStep1) {
         router.replace("/onboarding/step1");
+        return;
       }
+
+      if (!hasStep2) {
+        router.replace("/onboarding/step2");
+        return;
+      }
+
+      if (!hasStep3) {
+        router.replace("/onboarding/step3");
+        return;
+      }
+
+      router.replace("/(tabs)/home");
     }
     // If there is no session, the useEffect does nothing, and the welcome screen will be shown.
   }, [session, loading, profile]); // Add profile to the dependency array
