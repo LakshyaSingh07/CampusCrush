@@ -29,6 +29,7 @@ export default function WelcomeScreen() {
       const hasStep1 = Boolean(profile?.full_name && profile?.birthday);
       const hasStep2 = Boolean(profile?.department && profile?.grad_year);
       const hasStep3 = Boolean(profile?.gender);
+      const hasStep4 = Boolean(profile?.height_cm);
 
       if (!hasStep1) {
         router.replace("/onboarding/step1");
@@ -42,6 +43,11 @@ export default function WelcomeScreen() {
 
       if (!hasStep3) {
         router.replace("/onboarding/step3");
+        return;
+      }
+
+      if (!hasStep4) {
+        router.replace("/onboarding/step4");
         return;
       }
 
