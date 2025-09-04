@@ -1,5 +1,6 @@
 // step4.js
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   SafeAreaView,
@@ -9,9 +10,43 @@ import {
   View,
 } from "react-native";
 import WheelPickerExpo from "react-native-wheel-picker-expo";
+import { useAuth } from "../../context/AuthProvider";
+const initialAlertState = {
+  visible: false,
+  title: "",
+  message: "",
+  buttons: [],
+};
 
 export default function Step4() {
+  const router = useRouter();
+  const { updateProfile } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [alert, setAlert] = useState(initialAlertState);
   const [selectedHeight, setSelectedHeight] = useState(160);
+
+  const handleNext = async () => {
+    setLoading(true);
+    const { error } = await updateProfile({ height_cm: selectedHeight });
+    if (error) {
+      setAlert({
+        visible: true,
+        title: "Error",
+        message: error.message,
+        buttons: [
+          {
+            text: "OK",
+            onPress: () => setAlert(initialAlertState),
+            style: "primary",
+          },
+        ],
+      });
+    } else {
+      console.log("Height updated! Ready for home.");
+      router.replace("/(tabs)/home");
+    }
+    setLoading(false);
+  };
 
   const heightOptions = Array.from({ length: 61 }, (_, i) => ({
     label: `${150 + i} cm`,
@@ -54,7 +89,7 @@ export default function Step4() {
       </View>
 
       {/* Floating Next Button */}
-      <TouchableOpacity style={styles.nextButton}>
+      <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
         <Ionicons name="arrow-forward" size={28} color="white" />
       </TouchableOpacity>
     </SafeAreaView>

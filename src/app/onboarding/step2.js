@@ -2,15 +2,15 @@ import { FontAwesome5 } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Modal,
-    Pressable,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 import CustomAlert from "../../components/CustomAlert";
 import { useAuth } from "../../context/AuthProvider";
@@ -78,7 +78,7 @@ export default function OnboardingStep2() {
     "Business Administration",
     "Law",
     "Pharmacy",
-    "Design",
+    "Hotel Management",
     "Other",
   ];
 
