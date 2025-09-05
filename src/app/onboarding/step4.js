@@ -42,8 +42,9 @@ export default function Step4() {
         ],
       });
     } else {
-      console.log("Height updated! Ready for home.");
-      router.replace("/(tabs)/home");
+      console.log("Height updated! Ready for Step5.");
+
+      router.replace("/onboarding/step5");
     }
     setLoading(false);
   };
