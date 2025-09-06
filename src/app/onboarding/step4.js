@@ -1,5 +1,5 @@
 // step4.js
-import { Ionicons } from "@expo/vector-icons";
+import { FontAwesome5 } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -91,7 +91,7 @@ export default function Step4() {
 
       {/* Floating Next Button */}
       <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-        <Ionicons name="arrow-forward" size={28} color="white" />
+        <FontAwesome5 name="arrow-right" size={20} color="white" />
       </TouchableOpacity>
     </SafeAreaView>
   );
