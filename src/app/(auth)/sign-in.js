@@ -66,7 +66,7 @@ export default function SignInScreen() {
       keyboardShowListener.remove();
       keyboardHideListener.remove();
     };
-  }, []);
+  }, [cardTranslateY]);
 
   // This function will handle the sign-in logic
   const signInWithOtp = async () => {
@@ -120,7 +120,7 @@ export default function SignInScreen() {
           params: { email: normalizedEmail },
         });
       }
-    } catch (e) {
+    } catch (_e) {
       setAlert({
         visible: true,
         title: "Error",

@@ -137,7 +137,7 @@ export default function OnboardingStep1() {
       keyboardShowListener.remove();
       keyboardHideListener.remove();
     };
-  }, []);
+  }, [cardTranslateY]);
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>

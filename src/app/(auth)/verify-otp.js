@@ -70,7 +70,7 @@ export default function VerifyOTPScreen() {
       keyboardShowListener.remove();
       keyboardHideListener.remove();
     };
-  }, []);
+  }, [cardTranslateY]);
 
   // NEW: useEffect to handle the countdown timer
   useEffect(() => {
@@ -154,7 +154,7 @@ export default function VerifyOTPScreen() {
       }
       // On success, AuthProvider picks up the new session and the guard in
       // _layout.js routes to the right onboarding step or to home.
-    } catch (e) {
+    } catch (_e) {
       // ... same catch block as before ...
       setAlert({
         visible: true,
