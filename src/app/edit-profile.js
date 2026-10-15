@@ -18,7 +18,11 @@ import {
 } from "react-native";
 import SelectField from "../components/SelectField";
 import { useAuth } from "../context/AuthProvider";
-import { resizedImageUrl, uploadToCloudinary } from "../lib/cloudinary";
+import {
+  deleteRemovedPhotos,
+  resizedImageUrl,
+  uploadPhotos,
+} from "../lib/cloudinary";
 import {
   DEPARTMENT_OPTIONS,
   GENDER_OPTIONS,
@@ -106,11 +110,10 @@ export default function EditProfileScreen() {
     setSaving(true);
     try {
       // Upload only newly picked photos; keep saved URLs as they are
-      const urls = await Promise.all(
-        photos
-          .filter(Boolean)
-          .map((p) => (p.url ? p.url : uploadToCloudinary(p)))
-      );
+      const filled = photos.filter(Boolean);
+      const uploaded = await uploadPhotos(filled.filter((p) => !p.url));
+      let next = 0;
+      const urls = filled.map((p) => p.url ?? uploaded[next++]);
 
       const { error } = await updateProfile({
         profile_image_urls: urls,
@@ -122,6 +125,9 @@ export default function EditProfileScreen() {
         interested_in: INTEREST_OPTIONS.find((o) => o.label === interest).value,
       });
       if (error) throw error;
+
+      const previousUrls = profile?.profile_image_urls ?? [];
+      deleteRemovedPhotos(previousUrls.filter((url) => !urls.includes(url)));
       router.back();
     } catch (e) {
       Alert.alert("Couldn't save", e.message || "Something went wrong. Please try again.");

@@ -13,7 +13,7 @@ import {
 import CustomAlert from "../../components/CustomAlert";
 import OnboardingProgress from "../../components/OnboardingProgress";
 import { useAuth } from "../../context/AuthProvider";
-import { uploadToCloudinary } from "../../lib/cloudinary";
+import { uploadPhotos } from "../../lib/cloudinary";
 import { MAX_PHOTOS, MIN_PHOTOS_REQUIRED } from "../../lib/onboarding";
 
 const initialAlertState = {
@@ -83,10 +83,8 @@ export default function OnboardingStep5() {
     setLoading(true);
 
     try {
-      // Upload in parallel; Promise.all keeps the order of the photo slots
-      const uploadedUrls = await Promise.all(
-        photos.filter(Boolean).map(uploadToCloudinary)
-      );
+      // Uploads run in parallel and keep the order of the photo slots
+      const uploadedUrls = await uploadPhotos(photos.filter(Boolean));
 
       const { error } = await updateProfile({
         profile_image_urls: uploadedUrls,
