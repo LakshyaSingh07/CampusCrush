@@ -1,8 +1,8 @@
-// step4.js
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import { useState } from "react";
 import {
+  ActivityIndicator,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -10,7 +10,13 @@ import {
   View,
 } from "react-native";
 import WheelPickerExpo from "react-native-wheel-picker-expo";
+import CustomAlert from "../../components/CustomAlert";
+import OnboardingProgress from "../../components/OnboardingProgress";
 import { useAuth } from "../../context/AuthProvider";
+
+const MIN_HEIGHT_CM = 150;
+const MAX_HEIGHT_CM = 210;
+
 const initialAlertState = {
   visible: false,
   title: "",
@@ -20,12 +26,17 @@ const initialAlertState = {
 
 export default function Step4() {
   const router = useRouter();
-  const { updateProfile } = useAuth();
+  const { profile, updateProfile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState(initialAlertState);
-  const [selectedHeight, setSelectedHeight] = useState(160);
+  const [selectedHeight, setSelectedHeight] = useState(
+    profile?.height_cm >= MIN_HEIGHT_CM && profile?.height_cm <= MAX_HEIGHT_CM
+      ? profile.height_cm
+      : 160
+  );
 
   const handleNext = async () => {
+    if (loading) return;
     setLoading(true);
     const { error } = await updateProfile({ height_cm: selectedHeight });
     if (error) {
@@ -42,24 +53,22 @@ export default function Step4() {
         ],
       });
     } else {
-      console.log("Height updated! Ready for Step5.");
-
-      router.replace("/onboarding/step5");
+      router.push("/onboarding/step5");
     }
     setLoading(false);
   };
 
-  const heightOptions = Array.from({ length: 61 }, (_, i) => ({
-    label: `${150 + i} cm`,
-    value: 150 + i,
-  }));
+  const heightOptions = Array.from(
+    { length: MAX_HEIGHT_CM - MIN_HEIGHT_CM + 1 },
+    (_, i) => ({
+      label: `${MIN_HEIGHT_CM + i} cm`,
+      value: MIN_HEIGHT_CM + i,
+    })
+  );
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Progress Bar */}
-      <View style={styles.progressBackground}>
-        <View style={styles.progressFill} />
-      </View>
+      <OnboardingProgress step={4} />
 
       {/* Heading */}
       <Text style={styles.title}>Now, let’s talk about you</Text>
@@ -77,7 +86,7 @@ export default function Step4() {
           height={420}
           width="100%"
           marginTop={50}
-          initialSelectedIndex={selectedHeight - 150}
+          initialSelectedIndex={selectedHeight - MIN_HEIGHT_CM}
           items={heightOptions}
           onChange={({ item }) => setSelectedHeight(item.value)}
           renderItem={({ label }) => (
@@ -90,9 +99,19 @@ export default function Step4() {
       </View>
 
       {/* Floating Next Button */}
-      <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-        <FontAwesome5 name="arrow-right" size={20} color="white" />
+      <TouchableOpacity
+        style={styles.nextButton}
+        onPress={handleNext}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <FontAwesome5 name="arrow-right" size={20} color="white" />
+        )}
       </TouchableOpacity>
+
+      <CustomAlert {...alert} />
     </SafeAreaView>
   );
 }
@@ -103,19 +122,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     paddingTop: 70,
     paddingHorizontal: 24,
-  },
-  progressBackground: {
-    height: 3,
-    backgroundColor: "#E5E5E5",
-    borderRadius: 2,
-    marginBottom: 20,
-    marginTop: 10,
-  },
-  progressFill: {
-    height: "100%",
-    width: "60%", // adjust progress here
-    backgroundColor: "black",
-    borderRadius: 2,
   },
   title: {
     fontSize: 28,

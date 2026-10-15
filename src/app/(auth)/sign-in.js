@@ -16,13 +16,8 @@ import {
   View,
 } from "react-native";
 import CustomAlert from "../../components/CustomAlert";
+import { isAllowedEmail, normalizeEmail } from "../../lib/onboarding";
 import { supabase } from "../../lib/supabase";
-
-// The allowed email domains for your university
-const ALLOWED_DOMAINS = [
-  "@galgotiasuniversity.ac.in",
-  "@galgotiasuniversity.edu.in",
-];
 
 // Initial state for the custom alert
 const initialAlertState = {
@@ -78,11 +73,10 @@ export default function SignInScreen() {
     // 1. Start loading
     setLoading(true);
 
-    // 2. Validate the email domain
-    const isValidDomain = ALLOWED_DOMAINS.some((domain) =>
-      email.endsWith(domain)
-    );
-    if (!isValidDomain) {
+    // 2. Validate the email domain (also enforced server-side by the
+    // handle_new_user trigger)
+    const normalizedEmail = normalizeEmail(email);
+    if (!isAllowedEmail(normalizedEmail)) {
       // Show custom alert if the email is invalid
       setAlert({
         visible: true,
@@ -103,7 +97,7 @@ export default function SignInScreen() {
     // 3. If valid, attempt to send OTP via Supabase
     try {
       const { error } = await supabase.auth.signInWithOtp({
-        email: email,
+        email: normalizedEmail,
       });
 
       if (error) {
@@ -121,13 +115,10 @@ export default function SignInScreen() {
           ],
         });
       } else {
-        // On success, inform the user
-
-        //   "Check your email",
-        //   "An OTP has been sent to your email address."
-        router.push({ pathname: "/verify-otp", params: { email: email } });
-
-        // In the next step, we will navigate the user to the OTP entry screen here.
+        router.push({
+          pathname: "/verify-otp",
+          params: { email: normalizedEmail },
+        });
       }
     } catch (e) {
       setAlert({

@@ -5,17 +5,54 @@ import {
   ActivityIndicator,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import CustomAlert from "../../components/CustomAlert";
+import OnboardingProgress from "../../components/OnboardingProgress";
 import { useAuth } from "../../context/AuthProvider";
-import { supabase } from "../../lib/supabase";
+import { GENDER_OPTIONS } from "../../lib/onboarding";
+
+// Who the user wants to see in discovery, stored as an array of genders
+const INTEREST_OPTIONS = [
+  { label: "Women", value: ["Woman"] },
+  { label: "Men", value: ["Man"] },
+  { label: "Everyone", value: GENDER_OPTIONS },
+];
+
+const initialAlertState = {
+  visible: false,
+  title: "",
+  message: "",
+  buttons: [],
+};
+
+const RadioChoice = ({ label, isActive, onPress }) => (
+  <Pressable
+    onPress={onPress}
+    style={[styles.choice, isActive && styles.choiceActive]}
+  >
+    <Text style={[styles.choiceText, isActive && styles.choiceTextActive]}>
+      {label}
+    </Text>
+    <View style={[styles.radioOuter, isActive && styles.radioOuterActive]}>
+      {isActive ? <View style={styles.radioInner} /> : null}
+    </View>
+  </Pressable>
+);
+
+const findInterestLabel = (interestedIn) =>
+  INTEREST_OPTIONS.find(
+    (opt) =>
+      interestedIn?.length === opt.value.length &&
+      opt.value.every((g) => interestedIn.includes(g))
+  )?.label ?? "";
 
 export default function OnboardingStep3() {
   const router = useRouter();
-  const { user, profile } = useAuth();
+  const { profile, updateProfile } = useAuth();
 
   const firstName = useMemo(() => {
     if (!profile?.full_name) return "";
@@ -23,49 +60,33 @@ export default function OnboardingStep3() {
     return parts[0];
   }, [profile?.full_name]);
 
-  const [selected, setSelected] = useState("");
+  const [gender, setGender] = useState(profile?.gender ?? "");
+  const [interest, setInterest] = useState(
+    findInterestLabel(profile?.interested_in)
+  );
   const [loading, setLoading] = useState(false);
-  const initialAlertState = {
-    visible: false,
-    title: "",
-    message: "",
-    buttons: [],
-  };
   const [alert, setAlert] = useState(initialAlertState);
-  const options = ["Woman", "Man", "Nonbinary"];
+
+  const canProceed = Boolean(gender && interest);
 
   const handleNext = async () => {
-    if (!selected) return;
+    if (!canProceed || loading) return;
     setLoading(true);
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ gender: selected })
-        .eq("user_id", user.id);
-      if (error) {
-        setAlert({
-          visible: true,
-          title: "Error",
-          message: error.message || "Failed to save your selection.",
-          buttons: [
-            {
-              text: "OK",
-              style: "primary",
-              onPress: () => setAlert(initialAlertState),
-            },
-          ],
-        });
-        return;
-      } else {
-        console.log("Gender updated! Ready for step 4.");
 
-        router.replace("/onboarding/step4");
-      }
-    } catch (_e) {
+    const interestedIn = INTEREST_OPTIONS.find(
+      (opt) => opt.label === interest
+    ).value;
+    const { error } = await updateProfile({
+      gender,
+      interested_in: interestedIn,
+    });
+
+    setLoading(false);
+    if (error) {
       setAlert({
         visible: true,
         title: "Error",
-        message: "Something went wrong. Please try again.",
+        message: error.message || "Failed to save your selection.",
         buttons: [
           {
             text: "OK",
@@ -74,58 +95,55 @@ export default function OnboardingStep3() {
           },
         ],
       });
-    } finally {
-      setLoading(false);
+      return;
     }
+
+    router.push("/onboarding/step4");
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.progressContainer}>
-        <View style={[styles.progressStep, styles.activeStep]} />
-        <View style={[styles.progressStep, styles.activeStep]} />
-        <View style={[styles.progressStep, styles.activeStep]} />
-        <View style={styles.progressStep} />
-      </View>
+      <OnboardingProgress step={3} />
 
-      <Text style={styles.headline}>
-        {firstName || "Your name"} is a great name
-      </Text>
-      <Text style={styles.subtitle}>
-        We love that you’re here. Pick the gender that best describes you.
-      </Text>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.headline}>
+          {firstName || "Your name"} is a great name
+        </Text>
+        <Text style={styles.subtitle}>
+          We love that you’re here. Tell us a bit about who you are and who
+          you’d like to meet.
+        </Text>
 
-      <Text style={styles.question}>Which gender best describes you?</Text>
-
-      <View style={{ gap: 12 }}>
-        {options.map((opt) => {
-          const isActive = selected === opt;
-          return (
-            <Pressable
+        <Text style={styles.question}>Which gender best describes you?</Text>
+        <View style={styles.choiceGroup}>
+          {GENDER_OPTIONS.map((opt) => (
+            <RadioChoice
               key={opt}
-              onPress={() => setSelected(opt)}
-              style={[styles.choice, isActive && styles.choiceActive]}
-            >
-              <Text
-                style={[styles.choiceText, isActive && styles.choiceTextActive]}
-              >
-                {opt}
-              </Text>
-              <View
-                style={[styles.radioOuter, isActive && styles.radioOuterActive]}
-              >
-                {isActive ? <View style={styles.radioInner} /> : null}
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
+              label={opt}
+              isActive={gender === opt}
+              onPress={() => setGender(opt)}
+            />
+          ))}
+        </View>
+
+        <Text style={styles.question}>Show me</Text>
+        <View style={styles.choiceGroup}>
+          {INTEREST_OPTIONS.map((opt) => (
+            <RadioChoice
+              key={opt.label}
+              label={opt.label}
+              isActive={interest === opt.label}
+              onPress={() => setInterest(opt.label)}
+            />
+          ))}
+        </View>
+      </ScrollView>
 
       <Pressable
         accessibilityRole="button"
-        style={[styles.fab, !selected && { opacity: 0.4 }]}
+        style={[styles.fab, !canProceed && { opacity: 0.4 }]}
         onPress={handleNext}
-        disabled={!selected}
+        disabled={!canProceed || loading}
       >
         {loading ? (
           <ActivityIndicator color="#fff" />
@@ -145,29 +163,14 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingTop: 70,
   },
-  progressContainer: {
-    flexDirection: "row",
-    gap: 4,
-    marginBottom: 24,
-  },
-  progressStep: {
-    flex: 1,
-    height: 4,
-    backgroundColor: "#e9ecef",
-    borderRadius: 2,
-  },
-  activeStep: {
-    backgroundColor: "#212529",
+  scrollContent: {
+    paddingBottom: 120, // Keep the last option clear of the FAB
   },
   headline: {
     fontSize: 28,
     fontWeight: "bold",
     color: "#212529",
     marginBottom: 8,
-  },
-  underline: {
-    textDecorationLine: "underline",
-    textDecorationColor: "#212529",
   },
   subtitle: {
     fontSize: 14,
@@ -179,6 +182,10 @@ const styles = StyleSheet.create({
     color: "#212529",
     marginBottom: 12,
     fontWeight: "600",
+  },
+  choiceGroup: {
+    gap: 12,
+    marginBottom: 28,
   },
   choice: {
     flexDirection: "row",

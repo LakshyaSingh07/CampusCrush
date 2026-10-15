@@ -132,7 +132,7 @@ export default function VerifyOTPScreen() {
     Keyboard.dismiss();
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.verifyOtp({
+      const { error } = await supabase.auth.verifyOtp({
         email: email,
         token: token,
         type: "email",
@@ -151,46 +151,9 @@ export default function VerifyOTPScreen() {
             },
           ],
         });
-      } else if (data.user) {
-        // On success, get the newly signed-in user's profile
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("full_name, birthday")
-          .eq("user_id", data.user.id)
-          .single();
-
-        // NEW: Add this line to debug the object we get back
-        console.log(
-          "DEBUG: Fetched profile object:",
-          JSON.stringify(profile, null, 2)
-        );
-
-        if (profileError) {
-          // Handle error fetching profile
-          setAlert({
-            visible: true,
-            title: "Error",
-            message: profileError.message,
-            buttons: [
-              {
-                text: "OK",
-                onPress: () => setAlert(initialAlertState),
-                style: "primary",
-              },
-            ],
-          });
-          return;
-        }
-
-        // Check if the profile is complete
-        if (profile && profile.full_name && profile.birthday) {
-          // If name exists, they are a returning user
-          router.replace("/(tabs)/home");
-        } else {
-          // If name is null, they are a new user, send to onboarding
-          router.replace("/onboarding/step1");
-        }
       }
+      // On success, AuthProvider picks up the new session and the guard in
+      // _layout.js routes to the right onboarding step or to home.
     } catch (e) {
       // ... same catch block as before ...
       setAlert({
@@ -211,11 +174,14 @@ export default function VerifyOTPScreen() {
   };
 
   const resendOtp = async () => {
-    // Show a small alert to confirm OTP has been resent
+    const { error } = await supabase.auth.signInWithOtp({ email });
+
     setAlert({
       visible: true,
-      title: "OTP Sent",
-      message: "A new OTP has been sent to your email.",
+      title: error ? "Error" : "OTP Sent",
+      message: error
+        ? error.message
+        : "A new OTP has been sent to your email.",
       buttons: [
         {
           text: "OK",
@@ -224,9 +190,7 @@ export default function VerifyOTPScreen() {
         },
       ],
     });
-
-    // Call Supabase to send another OTP
-    await supabase.auth.signInWithOtp({ email });
+    if (error) return;
 
     // Reset the timer
     setCountdown(60);

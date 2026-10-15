@@ -1,9 +1,7 @@
-import { useRouter } from "expo-router";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native"; // 1. Import Alert
 import { supabase } from "../../lib/supabase";
 
 export default function ProfileScreen() {
-  const router = useRouter();
   // 2. Create a function to show the confirmation dialog
   const showConfirmationAlert = () => {
     Alert.alert(
@@ -34,9 +32,11 @@ export default function ProfileScreen() {
         Alert.alert("Error", `Failed to delete account: ${error.message}`);
       } else {
         Alert.alert("Success", "Your account has been successfully deleted.");
-        // Ensure the local session is cleared and move user to sign-in directly
-        try { await supabase.auth.signOut(); } catch (_) {}
-        router.replace("/");
+        // Clearing the session makes the guard in _layout.js return to the
+        // welcome screen. The auth user no longer exists, so use local scope.
+        try {
+          await supabase.auth.signOut({ scope: "local" });
+        } catch (_) {}
       }
     } catch (e) {
       Alert.alert("Error", `An unexpected error occurred: ${e.message}`);

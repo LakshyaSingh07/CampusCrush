@@ -1,6 +1,5 @@
 import { FontAwesome5 } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
     ActivityIndicator,
@@ -12,12 +11,33 @@ import {
     View,
 } from "react-native";
 import CustomAlert from "../../components/CustomAlert";
+import OnboardingProgress from "../../components/OnboardingProgress";
 import { useAuth } from "../../context/AuthProvider";
+import { MAX_PHOTOS, MIN_PHOTOS_REQUIRED } from "../../lib/onboarding";
 
-// IMPORTANT: Replace these with your actual Cloudinary details
+// TODO(M1): replace the unsigned preset with signed uploads (see docs/TECHNICAL_DESIGN.md §5)
 const CLOUDINARY_CLOUD_NAME = "dvhqbvsyb";
 const CLOUDINARY_UPLOAD_PRESET = "campus_crush_unsigned";
-const MIN_PHOTOS_REQUIRED = 3;
+
+const uploadToCloudinary = async ({ uri, mimeType }) => {
+  const extension = uri.split(".").pop()?.toLowerCase() || "jpg";
+  const type =
+    mimeType || `image/${extension === "jpg" ? "jpeg" : extension}`;
+
+  const formData = new FormData();
+  formData.append("file", { uri, type, name: `upload.${extension}` });
+  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+    { method: "POST", body: formData }
+  );
+  const data = await response.json();
+  if (!data.secure_url) {
+    throw new Error(data.error?.message || "Image upload failed");
+  }
+  return data.secure_url;
+};
 
 const initialAlertState = {
   visible: false,
@@ -27,11 +47,10 @@ const initialAlertState = {
 };
 
 export default function OnboardingStep5() {
-  const router = useRouter();
   const { updateProfile } = useAuth();
 
   // Use an array of objects to store local file URI
-  const [photos, setPhotos] = useState(new Array(6).fill(null));
+  const [photos, setPhotos] = useState(new Array(MAX_PHOTOS).fill(null));
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState(initialAlertState);
 
@@ -39,87 +58,77 @@ export default function OnboardingStep5() {
   const canProceed = photoCount >= MIN_PHOTOS_REQUIRED;
 
   const handleImagePick = async (index) => {
-    // console.log("1. Tapped on photo slot, requesting permissions...");
+    if (loading) return;
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    // console.log("2. Permission status:", status);
     if (status !== "granted") {
-      //   console.log("3. Permission denied. Showing an alert to the user.");
       setAlert({
         visible: true,
         title: "Permission Denied",
         message: "We need access to your photos to continue.",
+        buttons: [
+          {
+            text: "OK",
+            style: "primary",
+            onPress: () => setAlert(initialAlertState),
+          },
+        ],
       });
       return;
     }
-    // console.log("4. Permission granted! Launching image picker...");
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [3, 4],
       quality: 0.8,
     });
 
     if (!result.canceled) {
-      //   console.log("5. Image selected successfully.");
-      const newPhotos = [...photos];
-      newPhotos[index] = { uri: result.assets[0].uri };
-      setPhotos(newPhotos);
-    } // else {
-    //   console.log("6. Image selection canceled by the user.");
-    // }
+      const { uri, mimeType } = result.assets[0];
+      setPhotos((prev) => {
+        const newPhotos = [...prev];
+        newPhotos[index] = { uri, mimeType };
+        return newPhotos;
+      });
+    }
   };
 
   const handleRemoveImage = (index) => {
-    const newPhotos = [...photos];
-    newPhotos[index] = null;
-    setPhotos(newPhotos);
+    if (loading) return;
+    setPhotos((prev) => {
+      const newPhotos = [...prev];
+      newPhotos[index] = null;
+      return newPhotos;
+    });
   };
 
   const handleNext = async () => {
-    if (!canProceed) return;
+    if (!canProceed || loading) return;
     setLoading(true);
 
     try {
-      const uploadedUrls = [];
+      // Upload in parallel; Promise.all keeps the order of the photo slots
+      const uploadedUrls = await Promise.all(
+        photos.filter(Boolean).map(uploadToCloudinary)
+      );
 
-      for (const photo of photos) {
-        if (photo && photo.uri) {
-          // Upload to Cloudinary
-          const formData = new FormData();
-          formData.append("file", {
-            uri: photo.uri,
-            type: `image/${photo.uri.split(".").pop()}`,
-            name: `upload.${photo.uri.split(".").pop()}`,
-          });
-          formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+      const { error } = await updateProfile({
+        profile_image_urls: uploadedUrls,
+      });
+      if (error) throw error;
 
-          const response = await fetch(
-            `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
-            {
-              method: "POST",
-              body: formData,
-            }
-          );
-
-          const data = await response.json();
-          if (data.secure_url) {
-            uploadedUrls.push(data.secure_url);
-          } else {
-            throw new Error("Image upload failed");
-          }
-        }
-      }
-
-      // Save URLs to Supabase
-      await updateProfile({ profile_image_urls: uploadedUrls });
-
-      router.replace("/(tabs)/home");
+      // Onboarding is now complete; the guard in _layout.js moves to home.
     } catch (error) {
       setAlert({
         visible: true,
         title: "Upload Failed",
-        message: error.message,
-        buttons: [{ text: "OK", onPress: () => setAlert(initialAlertState) }],
+        message: error.message || "Something went wrong. Please try again.",
+        buttons: [
+          {
+            text: "OK",
+            style: "primary",
+            onPress: () => setAlert(initialAlertState),
+          },
+        ],
       });
     } finally {
       setLoading(false);
@@ -128,14 +137,11 @@ export default function OnboardingStep5() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Progress Bar */}
-      <View style={styles.progressBarContainer}>
-        <View style={styles.progressBar} />
-      </View>
+      <OnboardingProgress step={5} />
 
       <Text style={styles.title}>Time to put a face to the name</Text>
       <Text style={styles.subtitle}>
-        You do you! Add at least {MIN_PHOTOS_REQUIRED} photos, whether it's you
+        You do you! Add at least {MIN_PHOTOS_REQUIRED} photos, whether it’s you
         with your pet, eating your fave food, or in a place you love.
       </Text>
 
@@ -193,18 +199,6 @@ export default function OnboardingStep5() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff", padding: 24, paddingTop: 70 },
-  progressBarContainer: {
-    height: 4,
-    backgroundColor: "#e9ecef",
-    borderRadius: 2,
-    marginBottom: 32,
-  },
-  progressBar: {
-    height: "100%",
-    width: "100%",
-    backgroundColor: "#212529",
-    borderRadius: 2,
-  },
   title: {
     fontSize: 32,
     fontWeight: "bold",
@@ -218,7 +212,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   slot: {
-    height: 90,
     width: "30%",
     aspectRatio: 3 / 4, // Portrait aspect ratio
     backgroundColor: "#f1f3f5",

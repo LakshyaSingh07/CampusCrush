@@ -5,62 +5,45 @@ const AuthContext = createContext({});
 
 export const useAuth = () => useContext(AuthContext);
 
+const fetchProfile = async (userId) => {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching profile:", error.message);
+  }
+  return data ?? null;
+};
+
 export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // DEBUG: Log when the provider first mounts.
-    console.log("--- AuthProvider Mounted: Starting initial auth check. ---");
+    let isMounted = true;
 
     const fetchAndValidateSession = async () => {
-      setLoading(true);
-
-      // DEBUG: Log before checking the server.
-      console.log("1. Validating session with Supabase server...");
+      // getUser() checks with the server, so a deleted user isn't treated as
+      // logged in just because a session is still cached locally.
       const {
         data: { user },
       } = await supabase.auth.getUser();
-
-      // DEBUG: Log the result from the server check.
-      console.log(
-        "2. Server check complete. User object:",
-        user
-          ? `Exists (ID: ${user.id})`
-          : "null (User deleted or not logged in)"
-      );
-
       const {
         data: { session: localSession },
       } = await supabase.auth.getSession();
 
       const currentSession = user ? localSession : null;
+      const currentProfile = currentSession
+        ? await fetchProfile(currentSession.user.id)
+        : null;
+
+      if (!isMounted) return;
       setSession(currentSession);
-
-      if (currentSession) {
-        // DEBUG: Log before fetching the user's profile.
-        console.log("3. Session is valid, fetching profile from database...");
-        const { data: userProfile, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("user_id", currentSession.user.id)
-          .single();
-
-        if (profileError) {
-          console.error("DEBUG: Error fetching profile:", profileError.message);
-        } else {
-          // DEBUG: Log the profile data that was fetched.
-          console.log(
-            "4. Profile fetched:",
-            userProfile ? `Name: ${userProfile.full_name}` : "No profile found."
-          );
-        }
-        setProfile(userProfile);
-      }
-
-      // DEBUG: Log when the entire initial process is finished.
-      console.log("5. Initial data fetch complete. App is ready.");
+      setProfile(currentProfile);
       setLoading(false);
     };
 
@@ -68,53 +51,57 @@ export const AuthProvider = ({ children }) => {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      // DEBUG: Log any live authentication changes (login, logout, etc.).
-      console.log(
-        `--- Auth State Changed --- Event: ${_event}`,
-        session ? "New session created." : "Session destroyed."
-      );
-      setSession(session);
-      if (!session) {
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
+      // The initial session is handled by fetchAndValidateSession above.
+      if (event === "INITIAL_SESSION") return;
+
+      if (!newSession) {
+        setSession(null);
         setProfile(null);
-      } else {
-        const { data: userProfile } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("user_id", session.user.id)
-          .single();
-        setProfile(userProfile);
+        return;
       }
+
+      // Token refreshes don't change the user, so there's no need to refetch.
+      if (event === "TOKEN_REFRESHED") {
+        setSession(newSession);
+        return;
+      }
+
+      // Don't await Supabase calls inside this callback (it can deadlock the
+      // auth client). Set the session and profile together so route guards
+      // never see a new session paired with a missing profile.
+      setTimeout(async () => {
+        const newProfile = await fetchProfile(newSession.user.id);
+        if (!isMounted) return;
+        setSession(newSession);
+        setProfile(newProfile);
+      }, 0);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  // A function to update the profile in the database AND in the local state
+  // Updates the profile in the database AND in the local state
   const updateProfile = async (updates) => {
-    if (!session) return;
+    if (!session) return { error: new Error("Not signed in") };
 
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .update(updates)
-        .eq("user_id", session.user.id)
-        .select() // to get the updated row back
-        .single();
+    // Upsert so this still works if the new-user trigger didn't create a row
+    const { data, error } = await supabase
+      .from("profiles")
+      .upsert({ user_id: session.user.id, ...updates }, { onConflict: "user_id" })
+      .select()
+      .single();
 
-      if (error) {
-        throw error;
-      }
-
-      if (data) {
-        console.log("AuthProvider: Local profile state updated.", data);
-        setProfile(data);
-      }
-      return { data };
-    } catch (error) {
+    if (error) {
       console.error("Error updating profile:", error.message);
       return { error };
     }
+
+    setProfile(data);
+    return { data };
   };
 
   const value = {

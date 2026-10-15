@@ -13,8 +13,8 @@ import {
   View,
 } from "react-native";
 import CustomAlert from "../../components/CustomAlert";
+import OnboardingProgress from "../../components/OnboardingProgress";
 import { useAuth } from "../../context/AuthProvider";
-import { supabase } from "../../lib/supabase";
 
 // A lightweight select field built with a modal list to avoid extra deps
 const SelectField = ({ label, placeholder, value, options, onSelect }) => {
@@ -66,7 +66,7 @@ const SelectField = ({ label, placeholder, value, options, onSelect }) => {
 
 export default function OnboardingStep2() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { profile, updateProfile } = useAuth();
 
   const departmentOptions = [
     "Computer Science",
@@ -91,8 +91,10 @@ export default function OnboardingStep2() {
     return years;
   }, []);
 
-  const [department, setDepartment] = useState("");
-  const [graduationYear, setGraduationYear] = useState("");
+  const [department, setDepartment] = useState(profile?.department ?? "");
+  const [graduationYear, setGraduationYear] = useState(
+    profile?.grad_year ? String(profile.grad_year) : ""
+  );
   const [loading, setLoading] = useState(false);
 
   const initialAlertState = {
@@ -106,16 +108,13 @@ export default function OnboardingStep2() {
   const canProceed = Boolean(department && graduationYear);
 
   const handleNext = async () => {
-    if (!canProceed) return;
+    if (!canProceed || loading) return;
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          department: department,
-          grad_year: parseInt(graduationYear, 10),
-        })
-        .eq("user_id", user.id);
+      const { error } = await updateProfile({
+        department: department,
+        grad_year: parseInt(graduationYear, 10),
+      });
 
       if (error) {
         setAlert({
@@ -132,7 +131,6 @@ export default function OnboardingStep2() {
         });
         return;
       } else {
-        console.log("Academics updated! Ready for step 3.");
         router.push("/onboarding/step3");
       }
     } catch (e) {
@@ -155,13 +153,7 @@ export default function OnboardingStep2() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Progress Bar */}
-      <View style={styles.progressContainer}>
-        <View style={[styles.progressStep, styles.activeStep]} />
-        <View style={[styles.progressStep, styles.activeStep]} />
-        <View style={styles.progressStep} />
-        <View style={styles.progressStep} />
-      </View>
+      <OnboardingProgress step={2} />
 
       <Text style={styles.title}>Where do we find you on campus?</Text>
 
@@ -187,7 +179,7 @@ export default function OnboardingStep2() {
         accessibilityRole="button"
         style={[styles.fab, !canProceed && { opacity: 0.4 }]}
         onPress={handleNext}
-        disabled={!canProceed}
+        disabled={!canProceed || loading}
       >
         {loading ? (
           <ActivityIndicator color="#fff" />
@@ -206,20 +198,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 24,
     paddingTop: 70,
-  },
-  progressContainer: {
-    flexDirection: "row",
-    gap: 4,
-    marginBottom: 32,
-  },
-  progressStep: {
-    flex: 1,
-    height: 4,
-    backgroundColor: "#e9ecef",
-    borderRadius: 2,
-  },
-  activeStep: {
-    backgroundColor: "#212529",
   },
   title: {
     fontSize: 28,

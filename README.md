@@ -1,8 +1,12 @@
-# Welcome to your Expo app 👋
+# CampusCrush
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A dating app for verified Galgotias University students. Built with Expo (React Native) and Supabase.
 
-## Get started
+- Product requirements: [docs/PRD.md](docs/PRD.md)
+- Architecture and data model: [docs/TECHNICAL_DESIGN.md](docs/TECHNICAL_DESIGN.md)
+- Status and roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
+
+## Setup
 
 1. Install dependencies
 
@@ -10,41 +14,48 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npm install
    ```
 
-2. Start the app
+2. Create a `.env` file in the project root (it's git-ignored):
+
+   ```bash
+   EXPO_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon key>
+   ```
+
+   Only `EXPO_PUBLIC_*` variables are bundled into the app. Never put the service role key or Cloudinary API secret in an `EXPO_PUBLIC_` variable.
+
+3. Start the app
 
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+## Supabase
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+The schema lives in [supabase/migrations/](supabase/migrations/). To apply it to the linked project:
 
 ```bash
-npm run reset-project
+npx supabase link --project-ref <project-ref>
+npx supabase db push
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Deploy the account-deletion edge function and set its secrets:
 
-## Learn more
+```bash
+npx supabase functions deploy delete-user
+npx supabase secrets set CLOUDINARY_CLOUD_NAME=... CLOUDINARY_API_KEY=... CLOUDINARY_API_SECRET=...
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+## Project layout
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```
+src/app/            expo-router routes
+  _layout.js        root stack + auth/onboarding route guard
+  index.js          welcome screen
+  (auth)/           email OTP sign-in
+  onboarding/       5-step profile setup
+  (tabs)/           main app (home, liked you, chats, profile)
+src/context/        AuthProvider (session + profile)
+src/lib/            supabase client, onboarding helpers
+src/components/     shared UI
+supabase/           migrations and edge functions
+```

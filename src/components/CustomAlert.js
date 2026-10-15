@@ -1,6 +1,6 @@
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
-const CustomAlert = ({ visible, title, message, buttons }) => {
+const CustomAlert = ({ visible, title, message, buttons = [] }) => {
   return (
     <Modal
       visible={visible}

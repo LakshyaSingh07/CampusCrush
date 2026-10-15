@@ -1,6 +1,5 @@
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -15,52 +14,9 @@ import { useAuth } from "../context/AuthProvider";
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  // Get session, loading, AND the new profile state
-  const { session, loading, profile } = useAuth();
+  const { session, loading } = useAuth();
 
-  useEffect(() => {
-    // If the provider is still loading data, do nothing yet.
-    if (loading) {
-      return;
-    }
-
-    // On refresh or cold start, gate access based on onboarding progress
-    if (session) {
-      const hasStep1 = Boolean(profile?.full_name && profile?.birthday);
-      const hasStep2 = Boolean(profile?.department && profile?.grad_year);
-      const hasStep3 = Boolean(profile?.gender);
-      const hasStep4 = Boolean(profile?.height_cm);
-      const hasStep5 = Boolean(profile?.profile_image_urls)
-
-      if (!hasStep1) {
-        router.replace("/onboarding/step1");
-        return;
-      }
-
-      if (!hasStep2) {
-        router.replace("/onboarding/step2");
-        return;
-      }
-
-      if (!hasStep3) {
-        router.replace("/onboarding/step3");
-        return;
-      }
-
-      if (!hasStep4) {
-        router.replace("/onboarding/step4");
-        return;
-      }
-
-      if (!hasStep5) {
-        router.replace("/onboarding/step5");
-        return;
-      }
-
-      router.replace("/(tabs)/home");
-    }
-    // If there is no session, the useEffect does nothing, and the welcome screen will be shown.
-  }, [session, loading, profile]); // Add profile to the dependency array
+  // Redirects for signed-in users are handled by the guard in _layout.js.
 
   // While we check for a session, show a loading screen.
   if (loading) {
@@ -72,7 +28,7 @@ export default function WelcomeScreen() {
   }
 
   // This prevents the flicker. If a session exists, render nothing while the
-  // useEffect above handles the redirect.
+  // root layout's guard handles the redirect.
   if (session) {
     return null;
   }

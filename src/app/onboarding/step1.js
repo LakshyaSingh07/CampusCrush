@@ -16,7 +16,9 @@ import {
   View,
 } from "react-native";
 import CustomAlert from "../../components/CustomAlert";
+import OnboardingProgress from "../../components/OnboardingProgress";
 import { useAuth } from "../../context/AuthProvider";
+import { parseBirthday } from "../../lib/onboarding";
 
 const initialAlertState = {
   visible: false,
@@ -27,12 +29,14 @@ const initialAlertState = {
 
 export default function OnboardingStep1() {
   const router = useRouter();
-  const { user, updateProfile } = useAuth(); // We'll need to update AuthProvider for this
+  const { profile, updateProfile } = useAuth();
 
-  const [firstName, setFirstName] = useState("");
-  const [day, setDay] = useState("");
-  const [month, setMonth] = useState("");
-  const [year, setYear] = useState("");
+  // Prefill when the user comes back to this step
+  const [savedYear, savedMonth, savedDay] = profile?.birthday?.split("-") ?? [];
+  const [firstName, setFirstName] = useState(profile?.full_name ?? "");
+  const [day, setDay] = useState(savedDay ?? "");
+  const [month, setMonth] = useState(savedMonth ?? "");
+  const [year, setYear] = useState(savedYear ?? "");
 
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState(initialAlertState);
@@ -58,15 +62,27 @@ export default function OnboardingStep1() {
       return;
     }
 
-    const birthday = `${year}-${month}-${day}`;
-    // You can add more robust date validation here if needed
+    const { birthday, error: birthdayError } = parseBirthday(day, month, year);
+    if (birthdayError) {
+      setAlert({
+        visible: true,
+        title: "Check your birthday",
+        message: birthdayError,
+        buttons: [
+          {
+            text: "OK",
+            onPress: () => setAlert(initialAlertState),
+            style: "primary",
+          },
+        ],
+      });
+      return;
+    }
 
     setLoading(true);
 
-    // --- THIS IS THE UPDATED LOGIC ---
-    // Instead of calling Supabase directly, we call our new function.
     const { error } = await updateProfile({
-      full_name: firstName,
+      full_name: firstName.trim(),
       birthday: birthday,
     });
 
@@ -85,8 +101,6 @@ export default function OnboardingStep1() {
         ],
       });
     } else {
-      // If successful, navigate to the next step
-      console.log("Profile updated! Ready for step 2.");
       router.push("/onboarding/step2");
     }
 
@@ -128,15 +142,9 @@ export default function OnboardingStep1() {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <SafeAreaView style={styles.container}>
-        {/* Progress Bar */}
-        <View style={styles.progressContainer}>
-          <View style={[styles.progressStep, styles.activeStep]} />
-          <View style={styles.progressStep} />
-          <View style={styles.progressStep} />
-          <View style={styles.progressStep} />
-        </View>
+        <OnboardingProgress step={1} />
 
-        <Text style={styles.title}>Oh hey! Let's start with an intro.</Text>
+        <Text style={styles.title}>Oh hey! Let’s start with an intro.</Text>
 
         {/* Form Fields */}
         <View style={styles.form}>
@@ -145,6 +153,7 @@ export default function OnboardingStep1() {
             style={styles.input}
             value={firstName}
             onChangeText={setFirstName}
+            maxLength={50}
             returnKeyType="next"
           />
 
@@ -186,7 +195,7 @@ export default function OnboardingStep1() {
             />
           </View>
           <Text style={styles.birthdayHint}>
-            It's never too early to count down
+            It’s never too early to count down
           </Text>
         </View>
 
@@ -216,20 +225,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 24,
     paddingTop: 70,
-  },
-  progressContainer: {
-    flexDirection: "row",
-    gap: 4,
-    marginBottom: 32,
-  },
-  progressStep: {
-    flex: 1,
-    height: 4,
-    backgroundColor: "#e9ecef",
-    borderRadius: 2,
-  },
-  activeStep: {
-    backgroundColor: "#343a40",
   },
   title: {
     fontSize: 32,
