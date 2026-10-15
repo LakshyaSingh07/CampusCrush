@@ -13,14 +13,11 @@ import {
 import CustomAlert from "../../components/CustomAlert";
 import OnboardingProgress from "../../components/OnboardingProgress";
 import { useAuth } from "../../context/AuthProvider";
-import { GENDER_OPTIONS } from "../../lib/onboarding";
-
-// Who the user wants to see in discovery, stored as an array of genders
-const INTEREST_OPTIONS = [
-  { label: "Women", value: ["Woman"] },
-  { label: "Men", value: ["Man"] },
-  { label: "Everyone", value: GENDER_OPTIONS },
-];
+import {
+  GENDER_OPTIONS,
+  INTEREST_OPTIONS,
+  interestLabelFor,
+} from "../../lib/onboarding";
 
 const initialAlertState = {
   visible: false,
@@ -43,13 +40,6 @@ const RadioChoice = ({ label, isActive, onPress }) => (
   </Pressable>
 );
 
-const findInterestLabel = (interestedIn) =>
-  INTEREST_OPTIONS.find(
-    (opt) =>
-      interestedIn?.length === opt.value.length &&
-      opt.value.every((g) => interestedIn.includes(g))
-  )?.label ?? "";
-
 export default function OnboardingStep3() {
   const router = useRouter();
   const { profile, updateProfile } = useAuth();
@@ -62,7 +52,7 @@ export default function OnboardingStep3() {
 
   const [gender, setGender] = useState(profile?.gender ?? "");
   const [interest, setInterest] = useState(
-    findInterestLabel(profile?.interested_in)
+    interestLabelFor(profile?.interested_in)
   );
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState(initialAlertState);

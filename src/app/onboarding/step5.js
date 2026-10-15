@@ -13,31 +13,8 @@ import {
 import CustomAlert from "../../components/CustomAlert";
 import OnboardingProgress from "../../components/OnboardingProgress";
 import { useAuth } from "../../context/AuthProvider";
+import { uploadToCloudinary } from "../../lib/cloudinary";
 import { MAX_PHOTOS, MIN_PHOTOS_REQUIRED } from "../../lib/onboarding";
-
-// TODO(M1): replace the unsigned preset with signed uploads (see docs/TECHNICAL_DESIGN.md §5)
-const CLOUDINARY_CLOUD_NAME = "dvhqbvsyb";
-const CLOUDINARY_UPLOAD_PRESET = "campus_crush_unsigned";
-
-const uploadToCloudinary = async ({ uri, mimeType }) => {
-  const extension = uri.split(".").pop()?.toLowerCase() || "jpg";
-  const type =
-    mimeType || `image/${extension === "jpg" ? "jpeg" : extension}`;
-
-  const formData = new FormData();
-  formData.append("file", { uri, type, name: `upload.${extension}` });
-  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-
-  const response = await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
-    { method: "POST", body: formData }
-  );
-  const data = await response.json();
-  if (!data.secure_url) {
-    throw new Error(data.error?.message || "Image upload failed");
-  }
-  return data.secure_url;
-};
 
 const initialAlertState = {
   visible: false,

@@ -5,6 +5,39 @@ export const ONBOARDING_STEPS = 5;
 
 export const GENDER_OPTIONS = ["Woman", "Man", "Nonbinary"];
 
+// Who the user wants to see in discovery, stored as an array of genders
+export const INTEREST_OPTIONS = [
+  { label: "Women", value: ["Woman"] },
+  { label: "Men", value: ["Man"] },
+  { label: "Everyone", value: GENDER_OPTIONS },
+];
+
+export const interestLabelFor = (interestedIn) =>
+  INTEREST_OPTIONS.find(
+    (opt) =>
+      interestedIn?.length === opt.value.length &&
+      opt.value.every((g) => interestedIn.includes(g))
+  )?.label ?? "";
+
+export const DEPARTMENT_OPTIONS = [
+  "Computer Science",
+  "Information Technology",
+  "Electronics & Communication",
+  "Mechanical Engineering",
+  "Civil Engineering",
+  "Electrical Engineering",
+  "Business Administration",
+  "Law",
+  "Pharmacy",
+  "Hotel Management",
+  "Other",
+];
+
+export const getGraduationYearOptions = () => {
+  const currentYear = new Date().getFullYear();
+  return Array.from({ length: 9 }, (_, i) => String(currentYear + i));
+};
+
 export const ALLOWED_EMAIL_DOMAINS = [
   "galgotiasuniversity.ac.in",
   "galgotiasuniversity.edu.in",

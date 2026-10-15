@@ -3,93 +3,27 @@ import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   SafeAreaView,
   StyleSheet,
   Text,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import CustomAlert from "../../components/CustomAlert";
 import OnboardingProgress from "../../components/OnboardingProgress";
+import SelectField from "../../components/SelectField";
 import { useAuth } from "../../context/AuthProvider";
-
-// A lightweight select field built with a modal list to avoid extra deps
-const SelectField = ({ label, placeholder, value, options, onSelect }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <View style={{ marginBottom: 24 }}>
-      <Text style={styles.label}>{label}</Text>
-      <Pressable style={styles.select} onPress={() => setIsOpen(true)}>
-        <Text style={[styles.selectText, !value && { color: "#adb5bd" }]}>
-          {value || placeholder}
-        </Text>
-        <FontAwesome5 name="chevron-down" size={14} color="#495057" />
-      </Pressable>
-
-      <Modal
-        visible={isOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsOpen(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setIsOpen(false)}>
-          <View style={styles.modalBackdrop}>
-            <TouchableWithoutFeedback>
-              <View style={styles.sheet}>
-                <Text style={styles.sheetTitle}>{label}</Text>
-                <View style={styles.optionList}>
-                  {options.map((option) => (
-                    <TouchableOpacity
-                      key={option}
-                      onPress={() => {
-                        onSelect(option);
-                        setIsOpen(false);
-                      }}
-                      style={styles.option}
-                    >
-                      <Text style={styles.optionText}>{option}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-    </View>
-  );
-};
+import {
+  DEPARTMENT_OPTIONS,
+  getGraduationYearOptions,
+} from "../../lib/onboarding";
 
 export default function OnboardingStep2() {
   const router = useRouter();
   const { profile, updateProfile } = useAuth();
 
-  const departmentOptions = [
-    "Computer Science",
-    "Information Technology",
-    "Electronics & Communication",
-    "Mechanical Engineering",
-    "Civil Engineering",
-    "Electrical Engineering",
-    "Business Administration",
-    "Law",
-    "Pharmacy",
-    "Hotel Management",
-    "Other",
-  ];
-
-  const graduationYearOptions = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const years = [];
-    for (let y = currentYear; y <= currentYear + 8; y += 1) {
-      years.push(String(y));
-    }
-    return years;
-  }, []);
+  const departmentOptions = DEPARTMENT_OPTIONS;
+  const graduationYearOptions = useMemo(getGraduationYearOptions, []);
 
   const [department, setDepartment] = useState(profile?.department ?? "");
   const [graduationYear, setGraduationYear] = useState(
@@ -133,7 +67,7 @@ export default function OnboardingStep2() {
       } else {
         router.push("/onboarding/step3");
       }
-    } catch (e) {
+    } catch (_e) {
       setAlert({
         visible: true,
         title: "Error",
@@ -205,26 +139,6 @@ const styles = StyleSheet.create({
     color: "#212529",
     marginBottom: 32,
   },
-  label: {
-    fontSize: 16,
-    color: "#495057",
-    marginBottom: 8,
-  },
-  select: {
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    marginBottom: 4,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  selectText: {
-    fontSize: 16,
-    color: "#212529",
-  },
   fab: {
     position: "absolute",
     bottom: 40,
@@ -240,37 +154,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-  },
-  // Modal styles
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "flex-end",
-  },
-  sheet: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
-    maxHeight: "70%",
-  },
-  sheetTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#343a40",
-    marginBottom: 8,
-    paddingHorizontal: 8,
-  },
-  optionList: {
-    paddingVertical: 8,
-  },
-  option: {
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-  },
-  optionText: {
-    fontSize: 16,
-    color: "#212529",
   },
 });
