@@ -54,7 +54,8 @@ export const isAllowedEmail = (email) => {
 // when onboarding is done. Mirrors the `onboarding_done` generated column in
 // supabase/migrations — keep the two in sync.
 export const getNextOnboardingRoute = (profile) => {
-  if (!profile?.full_name || !profile?.birthday) return "/onboarding/step1";
+  if (!profile?.accepted_terms_at) return "/onboarding/rules";
+  if (!profile.full_name || !profile.birthday) return "/onboarding/step1";
   if (!profile.department || !profile.grad_year) return "/onboarding/step2";
   if (!profile.gender || !profile.interested_in?.length) {
     return "/onboarding/step3";
