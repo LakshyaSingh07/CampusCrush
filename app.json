@@ -27,6 +27,12 @@
       "expo-router",
       "expo-image-picker",
       [
+        "expo-notifications",
+        {
+          "color": "#7B61FF"
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./src/assets/logo.png",

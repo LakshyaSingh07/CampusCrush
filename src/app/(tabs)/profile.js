@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import ProfileCard from "../../components/ProfileCard";
 import { useAuth } from "../../context/AuthProvider";
+import { unregisterPushToken } from "../../lib/notifications";
 import { toPublicProfile } from "../../lib/profile";
 import { supabase } from "../../lib/supabase";
 
@@ -36,7 +37,13 @@ export default function ProfileScreen() {
     Alert.alert("Log out?", "You can log back in with your university email.", [
       { text: "Cancel", style: "cancel" },
       // Clearing the session makes the guard in _layout.js return to welcome
-      { text: "Log out", onPress: () => supabase.auth.signOut() },
+      {
+        text: "Log out",
+        onPress: async () => {
+          await unregisterPushToken();
+          supabase.auth.signOut();
+        },
+      },
     ]);
 
   const deleteAccount = async () => {
@@ -100,6 +107,16 @@ export default function ProfileScreen() {
             />
           )}
         </View>
+
+        <Pressable style={styles.linkRow} onPress={() => router.push("/legal/guidelines")}>
+          <FontAwesome5 name="book" size={16} color="#495057" />
+          <Text style={styles.linkText}>Community Guidelines</Text>
+        </Pressable>
+
+        <Pressable style={styles.linkRow} onPress={() => router.push("/legal/privacy")}>
+          <FontAwesome5 name="lock" size={16} color="#495057" />
+          <Text style={styles.linkText}>Privacy Policy</Text>
+        </Pressable>
 
         <Pressable style={styles.linkRow} onPress={logout}>
           <FontAwesome5 name="sign-out-alt" size={16} color="#495057" />

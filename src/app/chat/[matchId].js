@@ -18,6 +18,7 @@ import {
 import SafetyMenu from "../../components/SafetyMenu";
 import { useAuth } from "../../context/AuthProvider";
 import { resizedImageUrl } from "../../lib/cloudinary";
+import { setActiveChat } from "../../lib/notifications";
 import { supabase } from "../../lib/supabase";
 
 const PAGE_SIZE = 100;
@@ -40,6 +41,7 @@ export default function ChatScreen() {
 
   useEffect(() => {
     let isMounted = true;
+    setActiveChat(matchId);
 
     const load = async () => {
       const { data, error } = await supabase
@@ -80,6 +82,7 @@ export default function ChatScreen() {
 
     return () => {
       isMounted = false;
+      setActiveChat(null);
       supabase.removeChannel(channel);
     };
   }, [matchId, user?.id, markRead]);
