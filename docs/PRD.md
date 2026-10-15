@@ -90,7 +90,7 @@ Status: ✅ done · 🟡 partial · ⬜ not started
 | ONB-7 | 3–6 photos | ✅ |
 | ONB-8 | Short bio + optional prompts / interests | 🟡 bio in Edit Profile; no prompts |
 | ONB-9 | Resume onboarding at the first unfinished step after an app restart | ✅ |
-| ONB-10 | Accept community guidelines + privacy policy | ⬜ |
+| ONB-10 | Accept community guidelines + privacy policy | ✅ (text is a draft, needs review) |
 
 ### 7.3 Discovery (Home tab)
 | ID | Requirement | Status |
@@ -115,7 +115,7 @@ Status: ✅ done · 🟡 partial · ⬜ not started
 | CHT-1 | List of matches and conversations, sorted by latest message | ✅ |
 | CHT-2 | Real-time 1:1 text messaging between matched users only | ✅ |
 | CHT-3 | Unread indicators | ✅ |
-| CHT-4 | Push notifications for new match and new message | ⬜ |
+| CHT-4 | Push notifications for new match and new message | ✅ (needs `eas init` + dev build) |
 
 ### 7.6 Profile and settings
 | ID | Requirement | Status |
@@ -129,10 +129,10 @@ Status: ✅ done · 🟡 partial · ⬜ not started
 | ID | Requirement | Status |
 |---|---|---|
 | SAF-1 | Block a user (hides both ways, ends the match) | ✅ |
-| SAF-2 | Report a user with a reason; admin review queue | 🟡 reports stored; no admin UI yet |
+| SAF-2 | Report a user with a reason; admin review queue | ✅ `admin_reports` view, bans, auto-hide at 3+ reporters |
 | SAF-3 | Row-Level Security so users can only read public profile fields and only write their own data | ✅ |
 | SAF-4 | Basic photo moderation (e.g. Cloudinary moderation add-on, or manual review) | ⬜ |
-| SAF-5 | Rate-limit likes and messages | ⬜ |
+| SAF-5 | Rate-limit likes and messages | ✅ 1,000 swipes/day, 20 messages/min |
 
 ## 8. Non-functional requirements
 

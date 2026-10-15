@@ -66,23 +66,25 @@
 4. [x] **Liked You:** `get_liked_me()` grid, like back
 5. [x] **Chat:** `get_my_matches()`, `messages` with Supabase Realtime, read receipts
 6. [x] **Safety:** block, report, unmatch
-7. [ ] Community guidelines + privacy policy screens, accepted during onboarding (needed for store review)
-8. [ ] Move images to signed uploads or Supabase Storage. Photos removed in Edit Profile currently stay in Cloudinary until the account is deleted
+7. [x] House rules + Community Guidelines + Privacy Policy, accepted during onboarding (existing users are asked once)
+8. [x] Signed Cloudinary uploads into per-user folders (`sign-upload`), removed photos deleted (`delete-photos`)
 9. [ ] Two-device test of matching and chat (needs two university email accounts)
+10. [ ] Have the guidelines and privacy policy text (`src/content/legal.js`) reviewed, and add a support contact email
 
 ### M2 — Closed beta (≈2 weeks)
-- Push notifications (`expo-notifications`)
-- Analytics for the funnel metrics in the PRD (PostHog / Amplitude)
-- Crash reporting (Sentry)
-- EAS Build internal distribution to 50–100 students
-- Admin view for reports (Supabase dashboard or a small Retool/Next.js page)
+- [x] Push notifications for new matches and messages (DB triggers → Expo push via `pg_net`)
+- [x] Admin view for reports (`admin_reports` in the Supabase dashboard), bans, auto-hide after 3+ reporters
+- [x] Rate limits: 1,000 swipes/day, 20 messages/minute
+- [ ] `npx eas init` + development build, so push notifications can be tested
+- [ ] Analytics for the funnel metrics in the PRD (PostHog / Amplitude)
+- [ ] Crash reporting (Sentry)
+- [ ] EAS Build internal distribution to 50–100 students
 
 ### M3 — Launch
-- Store listings, privacy policy URL, App Store / Play dating-app compliance review
-- Photo moderation
-- Rate limiting, abuse monitoring
+- Store listings, hosted privacy policy URL, App Store / Play dating-app compliance review
+- Photo moderation (e.g. Cloudinary moderation add-on)
 - Prod Supabase project with backups
 
 ## 4. Suggested next step
 
-Apply the migrations and test on two devices (M0 and M1 item 9). Then add the guidelines/privacy screens and push notifications, so the app is ready for the closed beta (M2).
+Apply the migrations, deploy the three edge functions, run `eas init`, and test on two devices with a development build. Then add analytics and crash reporting and distribute the beta build (M2).

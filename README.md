@@ -38,12 +38,30 @@ npx supabase link --project-ref <project-ref>
 npx supabase db push
 ```
 
-Deploy the account-deletion edge function and set its secrets:
+Deploy the edge functions and set their secrets:
 
 ```bash
-npx supabase functions deploy delete-user
 npx supabase secrets set CLOUDINARY_CLOUD_NAME=... CLOUDINARY_API_KEY=... CLOUDINARY_API_SECRET=...
+npx supabase functions deploy sign-upload     # signs photo uploads
+npx supabase functions deploy delete-photos   # removes photos taken off a profile
+npx supabase functions deploy delete-user     # account deletion
 ```
+
+Once `sign-upload` is deployed, delete the old unsigned upload preset
+(`campus_crush_unsigned`) in Cloudinary → Settings → Upload. The app no longer uses it.
+
+### Push notifications
+
+Notifications are sent from the database (`pg_net`) to Expo's push service. To receive them:
+
+1. Run `npx eas init` once. It adds `extra.eas.projectId` to `app.json`, which the app needs to get a push token.
+2. Use a development build (`npx expo run:android` / `run:ios`, or EAS Build). Expo Go on Android can't receive remote notifications.
+
+### Moderation
+
+- Reports: open the `admin_reports` view in the Supabase table editor.
+- Anyone reported by 3+ different people is hidden from Discover until their open reports are marked `reviewed`, `actioned` or `dismissed` in the `reports` table.
+- To ban someone, set `banned_at = now()` (and optionally `ban_reason`) on their `profiles` row. They'll see a "suspended" screen and disappear from everyone's Discover, Liked You and Chats.
 
 ## Project layout
 

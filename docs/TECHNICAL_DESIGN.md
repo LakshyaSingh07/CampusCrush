@@ -143,21 +143,30 @@ Subscribe to `messages` filtered by `match_id` for open chats, and to `matches` 
 
 ## 5. Images
 
-Current setup: the client uploads to Cloudinary with an **unsigned preset**, and `delete-user` works out the `public_id` from the last part of the URL.
+Photos are stored in Cloudinary. The decision was to keep Cloudinary (face-aware resizing via `resizedImageUrl`, and an optional moderation add-on) and secure it:
 
-Risks:
-- Anyone who has the preset name can upload to the account.
-- Deriving the `public_id` breaks if a folder is set on the preset.
-- There is no moderation.
+1. The app calls the `sign-upload` edge function, which returns a signature for `folder=users/<user id>`.
+2. The app uploads directly to Cloudinary with that signature. The API secret never ships in the app.
+3. When photos are removed in Edit Profile, the app calls `delete-photos`. It only deletes files in the caller's own folder that are no longer on their profile.
+4. `delete-user` deletes all of a user's photos. `public_id`s are parsed from the URL by `extractPublicId` in `supabase/functions/_shared/cloudinary.ts`.
 
-Options:
-1. **Keep Cloudinary, but sign uploads.** Add a `sign-upload` edge function that returns a signature, and save the `public_id` next to the URL. Turn on the moderation add-on.
-2. **Move to Supabase Storage.** Use a private `avatars/{user_id}/` bucket with storage RLS and image transformations. Everything stays in one vendor and deletion is simple.
+Photos uploaded before signed uploads (outside a `users/` folder) can't be cleaned up by `delete-photos`. `delete-user` still removes them.
 
-Recommendation: option 2, unless Cloudinary's transformations and moderation are specifically needed.
+Still to do: photo moderation.
 
 ## 6. Push notifications
-Use `expo-notifications`. Store tokens in `push_tokens`. A database webhook or edge function on `matches`/`messages` inserts calls the Expo Push API.
+- The app registers its Expo push token with `register_push_token()` once onboarding is complete. On logout it calls `unregister_push_token()`.
+- Triggers on `matches` and `messages` call `send_push()`, which posts to `https://exp.host/--/api/v2/push/send` with `pg_net`. Failures are logged and never block the insert.
+- Match notifications only go to the person who didn't make the final swipe, because that person already sees the in-app match screen.
+- Tapping a notification opens the chat (`useLastNotificationResponse` in the root layout). Message banners are hidden while that chat is open.
+- Requires an EAS `projectId` (`npx eas init`) and a development build. Expo Go on Android can't receive remote notifications.
+
+## 6a. Moderation
+- `profiles.banned_at` / `ban_reason` are admin-only. A trigger rejects changes from the `authenticated` role.
+- Banned users see `/suspended`, can't swipe or send messages, and disappear from other users' feeds and match lists.
+- `is_under_review()` hides anyone with open reports from 3+ distinct reporters.
+- Rate limits: `swipe()` allows 1,000 swipes per day; a trigger on `messages` allows 20 per minute.
+- `admin_reports` (security-invoker view, no client access) lists reports with names, the reported user's email and reporter counts.
 
 ## 7. Environments and tooling (to add)
 
