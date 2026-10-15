@@ -1,21 +1,21 @@
+import { FontAwesome5 } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { FontAwesome5 } from "@expo/vector-icons"; // Or any other icon set you prefer
 
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#007bff", // Color for the active tab
-        tabBarInactiveTintColor: "gray", // Color for inactive tabs
+        headerShown: false,
+        tabBarActiveTintColor: "#7B61FF",
+        tabBarInactiveTintColor: "#adb5bd",
       }}
     >
       <Tabs.Screen
         name="home"
         options={{
-          title: "Home",
-          headerShown: false, // We often don't need a header on the main swiping screen
+          title: "Discover",
           tabBarIcon: ({ color }) => (
-            <FontAwesome5 name="fire" size={24} color={color} />
+            <FontAwesome5 name="fire" size={22} color={color} />
           ),
         }}
       />
@@ -24,7 +24,7 @@ export default function TabsLayout() {
         options={{
           title: "Liked You",
           tabBarIcon: ({ color }) => (
-            <FontAwesome5 name="comments" size={24} color={color} />
+            <FontAwesome5 name="heart" solid size={22} color={color} />
           ),
         }}
       />
@@ -33,7 +33,7 @@ export default function TabsLayout() {
         options={{
           title: "Chats",
           tabBarIcon: ({ color }) => (
-            <FontAwesome5 name="comment" size={24} color={color} />
+            <FontAwesome5 name="comment" solid size={22} color={color} />
           ),
         }}
       />
@@ -42,7 +42,7 @@ export default function TabsLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color }) => (
-            <FontAwesome5 name="user" size={24} color={color} />
+            <FontAwesome5 name="user" solid size={22} color={color} />
           ),
         }}
       />
