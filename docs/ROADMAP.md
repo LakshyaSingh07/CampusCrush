@@ -1,16 +1,18 @@
 # CampusCrush — Current State Audit and Roadmap
 
-## 1. What exists today
+## 1. What exists today (updated 2026-10-16)
 
-- ✅ Welcome screen, email OTP sign-in restricted to Galgotias domains (client-side check), OTP verify with resend timer
-- ✅ 5-step onboarding: name/birthday → department/year → gender → height → 3–6 photos (Cloudinary)
-- ✅ Auth context with session validation and a profile cache
-- ✅ `delete-user` edge function (Cloudinary images → profile row → auth user)
-- 🟡 Tab shell (Home, Liked You, Chats, Profile). Every tab is a placeholder except Profile, which only has debug Logout/Delete buttons
-- ❌ No discovery, swipes, matches, chat, profile editing, or safety features
-- ❌ No DB schema, triggers or RLS in the repo
+- ✅ Email OTP sign-in restricted to Galgotias domains (client and server)
+- ✅ 5-step onboarding with 18+ check and a "Show me" preference
+- ✅ Discover: swipe cards (drag or buttons), "It's a match!" screen
+- ✅ Liked You: grid of people who liked you, like back / pass
+- ✅ Chats: new matches row, conversation list with unread counts, real-time 1:1 chat
+- ✅ Profile: preview, edit photos/bio/details, pause profile, logout, delete account
+- ✅ Safety: unmatch, block, report (reporting also blocks)
+- ✅ Database schema, RLS and server functions in `supabase/migrations/`, tested against Postgres 15
+- ⏳ Migrations not yet applied to the Supabase project; app not yet tested on a device
 
-## 2. Bugs and gaps found (fix in M0)
+## 2. Original audit: bugs and gaps found (fixed in M0 unless noted)
 
 ### High priority
 | # | Where | Issue |
@@ -51,20 +53,22 @@
 - [x] `onboarding_done` generated column + a single route guard in `src/app/_layout.js`
 - [x] "Show me" (`interested_in`) question added to onboarding step 3
 - [x] Replace the README with real setup instructions
-- [ ] **Apply the migration** (`supabase db push`) and check for an older profile-creating trigger (see note below)
-- [ ] Bug #11: align Expo SDK packages (`npx expo install --fix`, then `npx expo-doctor`) and test on a device
+- [x] Bug #11: Expo SDK 54 packages aligned (`expo-doctor` 18/18, Android bundle builds)
+- [ ] **Apply the migrations** (`supabase db push`) and check for an older profile-creating trigger (see note below)
 - [ ] Test the full flow on a device: new user, returning user, user who stopped mid-onboarding, logout, delete account
 
-> **Before running the migration:** look in the Supabase dashboard (Database → Triggers on `auth.users`) for any existing trigger that inserts into `profiles`. If one exists under a name other than `on_auth_user_created`, drop it. Otherwise both triggers insert a row and sign-up fails with a duplicate-key error.
+> **Before running the migrations:** look in the Supabase dashboard (Database → Triggers on `auth.users`) for any existing trigger that inserts into `profiles`. If one exists under a name other than `on_auth_user_created`, drop it. Otherwise both triggers insert a row and sign-up fails with a duplicate-key error.
 
-### M1 — Core MVP (≈3–4 weeks)
-1. **Profile tab:** view own profile, edit fields and photos, logout, delete (proper UI)
-2. **Discovery:** `get_discovery_feed` RPC + swipe card UI (`react-native-gesture-handler` + `reanimated`, both already installed)
-3. **Swipes and matches:** `swipe()` RPC with atomic match creation, "It's a match" modal
-4. **Liked You:** `get_liked_me()` list/grid, like back
-5. **Chat:** `matches` list + `messages` with Supabase Realtime
-6. **Safety:** block, report, unmatch. Community guidelines and privacy policy screens
-7. Move images to signed uploads or Supabase Storage
+### M1 — Core MVP
+1. [x] **Profile tab:** preview, edit photos/bio/details, pause, logout, delete
+2. [x] **Discovery:** `get_discovery_feed()` + swipe cards
+3. [x] **Swipes and matches:** `swipe()` with atomic match creation, "It's a match" modal
+4. [x] **Liked You:** `get_liked_me()` grid, like back
+5. [x] **Chat:** `get_my_matches()`, `messages` with Supabase Realtime, read receipts
+6. [x] **Safety:** block, report, unmatch
+7. [ ] Community guidelines + privacy policy screens, accepted during onboarding (needed for store review)
+8. [ ] Move images to signed uploads or Supabase Storage. Photos removed in Edit Profile currently stay in Cloudinary until the account is deleted
+9. [ ] Two-device test of matching and chat (needs two university email accounts)
 
 ### M2 — Closed beta (≈2 weeks)
 - Push notifications (`expo-notifications`)
@@ -81,4 +85,4 @@
 
 ## 4. Suggested next step
 
-Start with **M0**. Discovery, matching and chat all depend on a version-controlled schema with RLS and a reliable onboarding flag. If those features are built on the current unprotected `profiles` table, the work will need redoing.
+Apply the migrations and test on two devices (M0 and M1 item 9). Then add the guidelines/privacy screens and push notifications, so the app is ready for the closed beta (M2).
