@@ -15,7 +15,7 @@ import ProfileCard from "./ProfileCard";
 // Drag right to like, left to pass. The parent can also trigger a swipe
 // through the ref (for the like/pass buttons): ref.current.swipe("like").
 const SwipeableCard = forwardRef(function SwipeableCard(
-  { profile, onSwipe, onMorePress, style },
+  { profile, onSwipe, onMorePress, onInfoPress, style },
   ref
 ) {
   const { width } = useWindowDimensions();
@@ -72,7 +72,12 @@ const SwipeableCard = forwardRef(function SwipeableCard(
   return (
     <GestureDetector gesture={pan}>
       <Animated.View style={[style, cardStyle]}>
-        <ProfileCard profile={profile} style={styles.fill} onMorePress={onMorePress} />
+        <ProfileCard
+          profile={profile}
+          style={styles.fill}
+          onMorePress={onMorePress}
+          onInfoPress={onInfoPress}
+        />
         <Animated.View style={[styles.stamp, styles.likeStamp, likeStyle]} pointerEvents="none">
           <Text style={[styles.stampText, { color: "#2f9e44" }]}>LIKE</Text>
         </Animated.View>

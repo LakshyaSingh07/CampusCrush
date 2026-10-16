@@ -1,5 +1,6 @@
 import { FontAwesome5 } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
     ActivityIndicator,
@@ -24,10 +25,17 @@ const initialAlertState = {
 };
 
 export default function OnboardingStep5() {
-  const { updateProfile } = useAuth();
+  const router = useRouter();
+  const { profile, updateProfile } = useAuth();
 
-  // Use an array of objects to store local file URI
-  const [photos, setPhotos] = useState(new Array(MAX_PHOTOS).fill(null));
+  // Each slot is { url } for an already-uploaded photo (when coming back to
+  // this step), { uri, mimeType } for a newly picked one, or null.
+  const [photos, setPhotos] = useState(() =>
+    Array.from({ length: MAX_PHOTOS }, (_, i) => {
+      const url = profile?.profile_image_urls?.[i];
+      return url ? { url, uri: url } : null;
+    })
+  );
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState(initialAlertState);
 
@@ -83,15 +91,16 @@ export default function OnboardingStep5() {
     setLoading(true);
 
     try {
-      // Uploads run in parallel and keep the order of the photo slots
-      const uploadedUrls = await uploadPhotos(photos.filter(Boolean));
+      // Upload only newly picked photos, keeping the order of the slots
+      const filled = photos.filter(Boolean);
+      const uploaded = await uploadPhotos(filled.filter((p) => !p.url));
+      let next = 0;
+      const urls = filled.map((p) => p.url ?? uploaded[next++]);
 
-      const { error } = await updateProfile({
-        profile_image_urls: uploadedUrls,
-      });
+      const { error } = await updateProfile({ profile_image_urls: urls });
       if (error) throw error;
 
-      // Onboarding is now complete; the guard in _layout.js moves to home.
+      router.push("/onboarding/step6");
     } catch (error) {
       setAlert({
         visible: true,

@@ -24,6 +24,14 @@ export const toPublicProfile = (profile) => ({
   height_cm: profile.height_cm,
   bio: profile.bio,
   photos: profile.profile_image_urls ?? [],
+  relationship_goal: profile.relationship_goal,
+  interests: profile.interests ?? [],
+  drinking: profile.drinker_status,
+  smoking: profile.smoker_status,
+  exercise: profile.exercise_status,
+  religion: profile.religion,
+  hometown: profile.hometown,
+  prompts: profile.prompt_answers ?? [],
 });
 
 export const REPORT_REASONS = [

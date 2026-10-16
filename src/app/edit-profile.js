@@ -16,8 +16,12 @@ import {
   TextInput,
   View,
 } from "react-native";
+import InterestPicker from "../components/InterestPicker";
+import LifestyleFields from "../components/LifestyleFields";
+import PromptEditor from "../components/PromptEditor";
 import SelectField from "../components/SelectField";
 import { useAuth } from "../context/AuthProvider";
+import { MIN_INTERESTS, RELATIONSHIP_GOALS } from "../lib/profileOptions";
 import {
   deleteRemovedPhotos,
   resizedImageUrl,
@@ -56,6 +60,18 @@ export default function EditProfileScreen() {
   );
   const [gender, setGender] = useState(profile?.gender ?? "");
   const [interest, setInterest] = useState(interestLabelFor(profile?.interested_in));
+  const [goal, setGoal] = useState(
+    RELATIONSHIP_GOALS.find((g) => g.value === profile?.relationship_goal)?.label ?? ""
+  );
+  const [interestTags, setInterestTags] = useState(profile?.interests ?? []);
+  const [lifestyle, setLifestyle] = useState({
+    drinker_status: profile?.drinker_status ?? null,
+    smoker_status: profile?.smoker_status ?? null,
+    exercise_status: profile?.exercise_status ?? null,
+    religion: profile?.religion ?? null,
+    hometown: profile?.hometown ?? "",
+  });
+  const [prompts, setPrompts] = useState(profile?.prompt_answers ?? []);
   const [saving, setSaving] = useState(false);
 
   const gradYearOptions = useMemo(() => {
@@ -102,8 +118,16 @@ export default function EditProfileScreen() {
       Alert.alert("Add more photos", `You need at least ${MIN_PHOTOS_REQUIRED} photos.`);
       return;
     }
-    if (!department || !gradYear || !height || !gender || !interest) {
+    if (!department || !gradYear || !height || !gender || !interest || !goal) {
       Alert.alert("Incomplete", "Please fill in all the fields.");
+      return;
+    }
+    if (interestTags.length < MIN_INTERESTS) {
+      Alert.alert("Add more interests", `Pick at least ${MIN_INTERESTS} interests.`);
+      return;
+    }
+    if (prompts.length < 1) {
+      Alert.alert("Add a prompt", "Answer at least one prompt.");
       return;
     }
 
@@ -123,6 +147,11 @@ export default function EditProfileScreen() {
         height_cm: parseInt(height, 10),
         gender,
         interested_in: INTEREST_OPTIONS.find((o) => o.label === interest).value,
+        relationship_goal: RELATIONSHIP_GOALS.find((g) => g.label === goal).value,
+        interests: interestTags,
+        ...lifestyle,
+        hometown: lifestyle.hometown.trim() || null,
+        prompt_answers: prompts,
       });
       if (error) throw error;
 
@@ -200,6 +229,24 @@ export default function EditProfileScreen() {
           <Text style={styles.counter}>
             {bio.length}/{BIO_MAX}
           </Text>
+
+          <Text style={styles.sectionTitle}>Prompts</Text>
+          <PromptEditor value={prompts} onChange={setPrompts} />
+
+          <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Interests</Text>
+          <InterestPicker value={interestTags} onChange={setInterestTags} />
+
+          <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Looking for</Text>
+          <SelectField
+            label="What are you looking for?"
+            placeholder="Select"
+            value={goal}
+            options={RELATIONSHIP_GOALS.map((g) => g.label)}
+            onSelect={setGoal}
+          />
+
+          <Text style={styles.sectionTitle}>Lifestyle</Text>
+          <LifestyleFields values={lifestyle} onChange={setLifestyle} />
 
           <Text style={styles.sectionTitle}>Details</Text>
           <SelectField

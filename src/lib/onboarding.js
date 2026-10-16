@@ -1,7 +1,9 @@
+import { MIN_INTERESTS } from "./profileOptions";
+
 export const MIN_PHOTOS_REQUIRED = 3;
 export const MAX_PHOTOS = 6;
 export const MIN_AGE = 18;
-export const ONBOARDING_STEPS = 5;
+export const ONBOARDING_STEPS = 9;
 
 export const GENDER_OPTIONS = ["Woman", "Man", "Nonbinary"];
 
@@ -64,6 +66,10 @@ export const getNextOnboardingRoute = (profile) => {
   if ((profile.profile_image_urls?.length ?? 0) < MIN_PHOTOS_REQUIRED) {
     return "/onboarding/step5";
   }
+  if (!profile.relationship_goal) return "/onboarding/step6";
+  if ((profile.interests?.length ?? 0) < MIN_INTERESTS) return "/onboarding/step7";
+  if (!profile.lifestyle_answered) return "/onboarding/step8";
+  if ((profile.prompt_answers?.length ?? 0) < 1) return "/onboarding/step9";
   return null;
 };
 
