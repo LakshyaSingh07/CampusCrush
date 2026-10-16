@@ -13,15 +13,14 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "../../context/AuthProvider";
+import { useEntitlements } from "../../context/EntitlementsProvider";
 import { resizedImageUrl } from "../../lib/cloudinary";
+import { formatTimeLeft, matchStatus, STATUS_LABELS } from "../../lib/matching";
 import { openChat } from "../../lib/navigation";
 import { supabase } from "../../lib/supabase";
 
-const toProfile = (m) => ({
-  user_id: m.other_user_id,
-  first_name: m.first_name,
-  photos: m.photos,
-});
+// get_my_matches rows are profile cards plus match fields
+const toProfile = (m) => ({ ...m, user_id: m.other_user_id });
 
 const formatTime = (iso) => {
   const date = new Date(iso);
@@ -37,6 +36,7 @@ const formatTime = (iso) => {
 export default function ChatsScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { match_limit, refresh: refreshEntitlements } = useEntitlements();
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -46,7 +46,8 @@ export default function ChatsScreen() {
     if (!error) setMatches(data);
     setLoading(false);
     setRefreshing(false);
-  }, []);
+    refreshEntitlements();
+  }, [refreshEntitlements]);
 
   useFocusEffect(
     useCallback(() => {
@@ -85,6 +86,13 @@ export default function ChatsScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Chats</Text>
+        {match_limit != null && (
+          <Pressable onPress={() => router.push({ pathname: "/premium", params: { reason: "matches" } })}>
+            <Text style={styles.limit}>
+              {matches.length}/{match_limit} active matches
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       <FlatList
@@ -101,21 +109,29 @@ export default function ChatsScreen() {
             <View style={styles.newMatches}>
               <Text style={styles.sectionTitle}>New matches</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {newMatches.map((m) => (
-                  <Pressable
-                    key={m.match_id}
-                    style={styles.newMatch}
-                    onPress={() => openChat(router, m.match_id, toProfile(m))}
-                  >
-                    <Image
-                      source={{ uri: resizedImageUrl(m.photos?.[0], 200) }}
-                      style={styles.newMatchPhoto}
-                    />
-                    <Text style={styles.newMatchName} numberOfLines={1}>
-                      {m.first_name}
-                    </Text>
-                  </Pressable>
-                ))}
+                {newMatches.map((m) => {
+                  const status = matchStatus(m, user?.id);
+                  const myMove = status.kind === "your_move" || status.kind === "say_hi";
+                  return (
+                    <Pressable
+                      key={m.match_id}
+                      style={styles.newMatch}
+                      onPress={() => openChat(router, m.match_id, toProfile(m))}
+                    >
+                      <Image
+                        source={{ uri: resizedImageUrl(m.photos?.[0], 200) }}
+                        style={[styles.newMatchPhoto, myMove && styles.myMoveRing]}
+                      />
+                      <Text style={styles.newMatchName} numberOfLines={1}>
+                        {m.first_name}
+                      </Text>
+                      <Text style={[styles.moveLabel, myMove && styles.myMoveLabel]} numberOfLines={1}>
+                        {STATUS_LABELS[status.kind]}
+                      </Text>
+                      <Text style={styles.timeLeft}>{formatTimeLeft(m.expires_at)}</Text>
+                    </Pressable>
+                  );
+                })}
               </ScrollView>
               {conversations.length > 0 && (
                 <Text style={[styles.sectionTitle, { marginTop: 16 }]}>
@@ -166,6 +182,14 @@ export default function ChatsScreen() {
                   {fromMe ? "You: " : ""}
                   {item.last_message}
                 </Text>
+                {item.expires_at && (
+                  <Text style={styles.expiry}>
+                    {matchStatus(item, user?.id).kind === "your_turn"
+                      ? "Your turn to reply"
+                      : "Waiting for a reply"}{" "}
+                    · {formatTimeLeft(item.expires_at)}
+                  </Text>
+                )}
               </View>
               {unread && (
                 <View style={styles.badge}>
@@ -191,9 +215,45 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 12,
+  },
+  limit: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#5f3dc4",
+    backgroundColor: "#f3f0ff",
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    overflow: "hidden",
+  },
+  myMoveRing: {
+    borderWidth: 3,
+    borderColor: "#7B61FF",
+  },
+  moveLabel: {
+    fontSize: 11,
+    color: "#868e96",
+    marginTop: 2,
+  },
+  myMoveLabel: {
+    color: "#7B61FF",
+    fontWeight: "700",
+  },
+  timeLeft: {
+    fontSize: 11,
+    color: "#adb5bd",
+  },
+  expiry: {
+    fontSize: 12,
+    color: "#e8590c",
+    marginTop: 2,
+    fontWeight: "600",
   },
   title: {
     fontSize: 28,

@@ -63,6 +63,16 @@ eas build --platform android --profile preview   # installable APK for testers
 
 Notifications are sent from the database (`pg_net`) to Expo's push service. Expo Go on Android can't receive them, so use an EAS build. Android also needs Firebase Cloud Messaging credentials uploaded to EAS: see https://docs.expo.dev/push-notifications/fcm-credentials/.
 
+### Premium (testing)
+
+Payments aren't live yet. To give a tester Premium, run this in the Supabase SQL editor:
+
+```sql
+select public.grant_premium('student@galgotiasuniversity.ac.in', 'week');  -- 'day' | 'week' | 'month'
+```
+
+Free accounts get 20 swipes a day (India time), up to 5 active matches, and only the count on Liked You. Premium removes those limits and adds undo. The limits are enforced in the database (`swipe()`, `get_liked_me()`, `undo_last_swipe()`).
+
 ### Moderation
 
 - Reports: open the `admin_reports` view in the Supabase table editor.

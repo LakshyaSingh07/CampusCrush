@@ -72,6 +72,23 @@
 9. [ ] Two-device test of matching and chat (needs two university email accounts)
 10. [ ] Have the guidelines and privacy policy text (`src/content/legal.js`) reviewed, and add a support contact email
 
+### M1.5 — Bumble-style features
+- [x] Onboarding steps 6–9: what you're looking for, 3–5 interests, lifestyle (optional) + hometown, prompts + bio
+- [x] Full profile view (photos interleaved with prompts, interests, lifestyle) from Discover, Liked You, Chat and Profile
+- [x] Women make the first move in woman–man matches; every match expires after 24h without a first message, then 24h to reply
+- [x] Premium: unlimited swipes (free: 20/day), unlimited matches (free: 5 active), see who likes you, undo last swipe
+- [x] Premium screen with plans: ₹9 / 1 day (one-time pass), ₹49 / week, ₹99 / month
+- [ ] **Payments**: choose and integrate a provider (see "Payments" below). Until then use `grant_premium()` for testers
+- [ ] Rematch / extend expired matches (Premium)
+
+#### Payments
+Google Play requires its own billing for subscriptions sold inside an Android app; Razorpay can't be used for that in a Play Store app. Options:
+1. **Google Play Billing via RevenueCat**: Google keeps 15% of subscriptions; $25 one-time Play Console fee; RevenueCat is free up to $2.5k monthly revenue. Works on iOS too (App Store) later.
+2. **Google Play Billing directly** (`react-native-iap`): same 15%, no RevenueCat, more code to verify purchases on the server.
+3. **Razorpay** for builds distributed outside the Play Store (APK beta only).
+
+Play and the App Store have no daily subscriptions, so ₹9/day is a one-time 24-hour pass. Store minimum prices may require ₹10.
+
 ### M2 — Closed beta (≈2 weeks)
 - [x] Push notifications for new matches and messages (DB triggers → Expo push via `pg_net`)
 - [x] Admin view for reports (`admin_reports` in the Supabase dashboard), bans, auto-hide after 3+ reporters

@@ -3,6 +3,7 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, useRef } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider, useAuth } from "../context/AuthProvider";
+import { EntitlementsProvider } from "../context/EntitlementsProvider";
 import { openChat } from "../lib/navigation";
 import { registerForPushNotifications } from "../lib/notifications";
 import { getNextOnboardingRoute } from "../lib/onboarding";
@@ -91,6 +92,7 @@ function RootNavigator() {
       <Stack.Screen name="edit-profile" />
       <Stack.Screen name="legal/[doc]" />
       <Stack.Screen name="suspended" />
+      <Stack.Screen name="premium" options={{ presentation: "modal" }} />
     </Stack>
   );
 }
@@ -99,7 +101,9 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
-        <RootNavigator />
+        <EntitlementsProvider>
+          <RootNavigator />
+        </EntitlementsProvider>
       </AuthProvider>
     </GestureHandlerRootView>
   );

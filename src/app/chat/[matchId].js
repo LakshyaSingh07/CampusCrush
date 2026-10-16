@@ -15,9 +15,11 @@ import {
   TextInput,
   View,
 } from "react-native";
+import ProfileDetails from "../../components/ProfileDetails";
 import SafetyMenu from "../../components/SafetyMenu";
 import { useAuth } from "../../context/AuthProvider";
 import { resizedImageUrl } from "../../lib/cloudinary";
+import { formatTimeLeft, matchStatus } from "../../lib/matching";
 import { setActiveChat } from "../../lib/notifications";
 import { supabase } from "../../lib/supabase";
 
@@ -34,9 +36,18 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
   const [menuVisible, setMenuVisible] = useState(false);
+  const [profileVisible, setProfileVisible] = useState(false);
+  // This match's row from get_my_matches: the other person's profile plus
+  // first-move/expiry state. null once the match has ended or expired.
+  const [match, setMatch] = useState(undefined);
 
   const markRead = useCallback(() => {
     supabase.rpc("mark_match_read", { p_match_id: matchId });
+  }, [matchId]);
+
+  const loadMatch = useCallback(async () => {
+    const { data } = await supabase.rpc("get_my_matches");
+    setMatch(data?.find((m) => m.match_id === matchId) ?? null);
   }, [matchId]);
 
   useEffect(() => {
@@ -57,6 +68,7 @@ export default function ChatScreen() {
       markRead();
     };
     load();
+    loadMatch();
 
     // Our own messages are added from the insert response, so only the other
     // person's messages need to come from realtime.
@@ -76,6 +88,8 @@ export default function ChatScreen() {
             prev.some((m) => m.id === message.id) ? prev : [message, ...prev]
           );
           markRead();
+          // Their first message unlocks replying and changes the expiry
+          loadMatch();
         }
       )
       .subscribe();
@@ -85,7 +99,23 @@ export default function ChatScreen() {
       setActiveChat(null);
       supabase.removeChannel(channel);
     };
-  }, [matchId, user?.id, markRead]);
+  }, [matchId, user?.id, markRead, loadMatch]);
+
+  const status = match ? matchStatus(match, user?.id) : null;
+  const timeLeft = formatTimeLeft(match?.expires_at);
+  const banner =
+    match === null
+      ? "This match has ended."
+      : status?.kind === "their_move"
+        ? `On CampusCrush, women make the first move. ${name} has ${timeLeft} to say hi.`
+        : status?.kind === "your_move"
+          ? `You make the first move! ${timeLeft} before this match expires.`
+          : status?.kind === "say_hi"
+            ? `Say hi! ${timeLeft} before this match expires.`
+            : status?.kind === "your_turn"
+              ? `Your turn to reply: ${timeLeft} before this match expires.`
+              : null;
+  const canSend = match !== null && (status?.canSend ?? true);
 
   const send = async () => {
     const body = text.trim();
@@ -122,6 +152,7 @@ export default function ChatScreen() {
       return;
     }
     setMessages((prev) => prev.map((m) => (m.id === tempId ? data : m)));
+    loadMatch();
   };
 
   const renderMessage = ({ item, index }) => {
@@ -161,12 +192,18 @@ export default function ChatScreen() {
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.headerButton}>
           <FontAwesome5 name="arrow-left" size={20} color="#212529" />
         </Pressable>
-        {photo ? (
-          <Image source={{ uri: resizedImageUrl(photo, 100) }} style={styles.headerAvatar} />
-        ) : null}
-        <Text style={styles.headerName} numberOfLines={1}>
-          {name}
-        </Text>
+        <Pressable
+          style={styles.headerProfile}
+          onPress={() => match && setProfileVisible(true)}
+          accessibilityLabel={`View ${name}'s profile`}
+        >
+          {photo ? (
+            <Image source={{ uri: resizedImageUrl(photo, 100) }} style={styles.headerAvatar} />
+          ) : null}
+          <Text style={styles.headerName} numberOfLines={1}>
+            {name}
+          </Text>
+        </Pressable>
         <Pressable
           onPress={() => setMenuVisible(true)}
           hitSlop={10}
@@ -202,26 +239,41 @@ export default function ChatScreen() {
           />
         )}
 
-        <View style={styles.composer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Type a message"
-            placeholderTextColor="#adb5bd"
-            value={text}
-            onChangeText={setText}
-            maxLength={MAX_LENGTH}
-            multiline
-          />
-          <Pressable
-            style={[styles.sendButton, !text.trim() && { opacity: 0.4 }]}
-            onPress={send}
-            disabled={!text.trim()}
-            accessibilityLabel="Send"
-          >
-            <FontAwesome5 name="paper-plane" solid size={16} color="#fff" />
-          </Pressable>
-        </View>
+        {banner && (
+          <View style={styles.banner}>
+            <FontAwesome5 name="hourglass-half" size={13} color="#e8590c" />
+            <Text style={styles.bannerText}>{banner}</Text>
+          </View>
+        )}
+
+        {canSend && (
+          <View style={styles.composer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Type a message"
+              placeholderTextColor="#adb5bd"
+              value={text}
+              onChangeText={setText}
+              maxLength={MAX_LENGTH}
+              multiline
+            />
+            <Pressable
+              style={[styles.sendButton, !text.trim() && { opacity: 0.4 }]}
+              onPress={send}
+              disabled={!text.trim()}
+              accessibilityLabel="Send"
+            >
+              <FontAwesome5 name="paper-plane" solid size={16} color="#fff" />
+            </Pressable>
+          </View>
+        )}
       </KeyboardAvoidingView>
+
+      <ProfileDetails
+        profile={match}
+        visible={profileVisible && !!match}
+        onClose={() => setProfileVisible(false)}
+      />
 
       <SafetyMenu
         visible={menuVisible}
@@ -256,6 +308,25 @@ const styles = StyleSheet.create({
   },
   headerButton: {
     padding: 4,
+  },
+  headerProfile: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  banner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#fff4e6",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  bannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#d9480f",
+    fontWeight: "600",
   },
   headerAvatar: {
     width: 36,

@@ -12,10 +12,13 @@ import {
 } from "react-native";
 import MatchModal from "../../components/MatchModal";
 import ProfileCard from "../../components/ProfileCard";
+import ProfileDetails from "../../components/ProfileDetails";
 import SafetyMenu from "../../components/SafetyMenu";
 import SwipeableCard from "../../components/SwipeableCard";
 import { useAuth } from "../../context/AuthProvider";
+import { useEntitlements } from "../../context/EntitlementsProvider";
 import { openChat } from "../../lib/navigation";
+import { LIMIT_ERRORS } from "../../lib/premium";
 import { supabase } from "../../lib/supabase";
 
 const PAGE_SIZE = 20;
@@ -23,11 +26,16 @@ const PAGE_SIZE = 20;
 export default function HomeScreen() {
   const router = useRouter();
   const { profile: myProfile } = useAuth();
+  const { is_premium, swipesLeft, refresh: refreshEntitlements } = useEntitlements();
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [match, setMatch] = useState(null);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [detailsVisible, setDetailsVisible] = useState(false);
+  const [undoing, setUndoing] = useState(false);
+
+  const openPaywall = (reason) => router.push({ pathname: "/premium", params: { reason } });
 
   const topCardRef = useRef(null);
   // Profiles already swiped this session. A refetch can race with an
@@ -66,6 +74,13 @@ export default function HomeScreen() {
     setCards((prev) => prev.filter((c) => c.user_id !== userId));
   };
 
+  const putCardBack = (profile) => {
+    swipedIds.current.delete(profile.user_id);
+    setCards((prev) =>
+      prev.some((c) => c.user_id === profile.user_id) ? prev : [profile, ...prev]
+    );
+  };
+
   const handleSwipe = async (profile, direction) => {
     removeTopCard(profile.user_id);
     const { data, error } = await supabase.rpc("swipe", {
@@ -73,12 +88,45 @@ export default function HomeScreen() {
       p_direction: direction,
     });
     if (error) {
-      Alert.alert("Error", error.message);
+      // Free-tier limit: bring the card back and show the Premium screen
+      const limit = LIMIT_ERRORS[error.message];
+      if (limit) {
+        putCardBack(profile);
+        refreshEntitlements();
+        openPaywall(limit);
+      } else {
+        Alert.alert("Error", error.message);
+      }
       return;
     }
+    refreshEntitlements();
     if (data?.[0]?.matched) {
       setMatch({ profile, matchId: data[0].match_id });
     }
+  };
+
+  // Buttons check the daily limit before animating; drags are checked by the server
+  const swipeWithButton = (direction) => {
+    if (swipesLeft === 0) return openPaywall("swipes");
+    topCardRef.current?.swipe(direction);
+  };
+
+  const undo = async () => {
+    if (!is_premium) return openPaywall("undo");
+    if (undoing) return;
+    setUndoing(true);
+    const { data, error } = await supabase.rpc("undo_last_swipe");
+    setUndoing(false);
+    if (error) {
+      const messages = {
+        nothing_to_undo: "There's nothing to undo yet.",
+        cannot_undo_match: "You matched with the last person you liked, so it can't be undone.",
+      };
+      Alert.alert("Can't undo", messages[error.message] ?? error.message);
+      return;
+    }
+    if (data) putCardBack(data);
+    refreshEntitlements();
   };
 
   const [top, next] = cards;
@@ -109,6 +157,12 @@ export default function HomeScreen() {
           <Pressable style={styles.refreshButton} onPress={loadFeed}>
             <Text style={styles.refreshText}>Refresh</Text>
           </Pressable>
+          {swipedIds.current.size > 0 && (
+            <Pressable style={styles.undoLink} onPress={undo} disabled={undoing}>
+              <FontAwesome5 name="undo" size={13} color="#f08c00" />
+              <Text style={styles.undoLinkText}>Undo last swipe</Text>
+            </Pressable>
+          )}
         </View>
       );
     }
@@ -128,6 +182,7 @@ export default function HomeScreen() {
           style={styles.card}
           onSwipe={(direction) => handleSwipe(top, direction)}
           onMorePress={() => setMenuVisible(true)}
+          onInfoPress={() => setDetailsVisible(true)}
         />
       </>
     );
@@ -137,6 +192,20 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.logo}>CampusCrush</Text>
+        {is_premium ? (
+          <View style={[styles.pill, styles.premiumPill]}>
+            <FontAwesome5 name="crown" size={11} color="#f08c00" />
+            <Text style={[styles.pillText, { color: "#e67700" }]}>Premium</Text>
+          </View>
+        ) : (
+          swipesLeft !== null && (
+            <Pressable style={styles.pill} onPress={() => openPaywall("swipes")}>
+              <Text style={styles.pillText}>
+                {swipesLeft} {swipesLeft === 1 ? "swipe" : "swipes"} left today
+              </Text>
+            </Pressable>
+          )
+        )}
       </View>
 
       {myProfile?.is_paused && (
@@ -152,21 +221,63 @@ export default function HomeScreen() {
       {top && (
         <View style={styles.actions}>
           <Pressable
+            style={[styles.actionButton, styles.smallButton]}
+            onPress={undo}
+            disabled={undoing}
+            accessibilityLabel="Undo last swipe"
+          >
+            {undoing ? (
+              <ActivityIndicator color="#f08c00" />
+            ) : (
+              <FontAwesome5 name="undo" size={18} color="#f08c00" />
+            )}
+          </Pressable>
+          <Pressable
             style={[styles.actionButton, styles.passButton]}
-            onPress={() => topCardRef.current?.swipe("pass")}
+            onPress={() => swipeWithButton("pass")}
             accessibilityLabel="Pass"
           >
             <FontAwesome5 name="times" size={28} color="#e03131" />
           </Pressable>
           <Pressable
             style={[styles.actionButton, styles.likeButton]}
-            onPress={() => topCardRef.current?.swipe("like")}
+            onPress={() => swipeWithButton("like")}
             accessibilityLabel="Like"
           >
             <FontAwesome5 name="heart" solid size={28} color="#fff" />
           </Pressable>
         </View>
       )}
+
+      <ProfileDetails
+        profile={top}
+        visible={detailsVisible && !!top}
+        onClose={() => setDetailsVisible(false)}
+        footer={
+          <View style={styles.actions}>
+            <Pressable
+              style={[styles.actionButton, styles.passButton]}
+              onPress={() => {
+                setDetailsVisible(false);
+                swipeWithButton("pass");
+              }}
+              accessibilityLabel="Pass"
+            >
+              <FontAwesome5 name="times" size={28} color="#e03131" />
+            </Pressable>
+            <Pressable
+              style={[styles.actionButton, styles.likeButton]}
+              onPress={() => {
+                setDetailsVisible(false);
+                swipeWithButton("like");
+              }}
+              accessibilityLabel="Like"
+            >
+              <FontAwesome5 name="heart" solid size={28} color="#fff" />
+            </Pressable>
+          </View>
+        }
+      />
 
       {top && (
         <SafetyMenu
@@ -180,6 +291,7 @@ export default function HomeScreen() {
 
       <MatchModal
         match={match}
+        myGender={myProfile?.gender}
         myPhoto={myProfile?.profile_image_urls?.[0]}
         onClose={() => setMatch(null)}
         onMessage={() => {
@@ -198,9 +310,35 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 8,
+  },
+  pill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#f3f0ff",
+    borderRadius: 14,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+  },
+  premiumPill: {
+    backgroundColor: "#fff4e6",
+  },
+  pillText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#5f3dc4",
+  },
+  smallButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#fff",
   },
   logo: {
     fontSize: 26,
@@ -262,8 +400,21 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 40,
+    alignItems: "center",
+    gap: 28,
     paddingVertical: 16,
+  },
+  undoLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 16,
+    padding: 8,
+  },
+  undoLinkText: {
+    color: "#f08c00",
+    fontWeight: "600",
+    fontSize: 15,
   },
   actionButton: {
     width: 64,

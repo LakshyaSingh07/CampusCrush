@@ -2,10 +2,20 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { resizedImageUrl } from "../lib/cloudinary";
+import { firstMoveRole } from "../lib/matching";
 
-export default function MatchModal({ match, myPhoto, onMessage, onClose }) {
+const FIRST_MOVE_TEXT = {
+  me: "You have 24 hours to make the first move.",
+  them: (name) => `${name} has 24 hours to make the first move.`,
+  either: "Either of you can say hi. You have 24 hours.",
+};
+
+export default function MatchModal({ match, myGender, myPhoto, onMessage, onClose }) {
   if (!match) return null;
   const { profile } = match;
+  const role = firstMoveRole(myGender, profile.gender);
+  const firstMoveText =
+    role === "them" ? FIRST_MOVE_TEXT.them(profile.first_name) : FIRST_MOVE_TEXT[role];
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -14,6 +24,7 @@ export default function MatchModal({ match, myPhoto, onMessage, onClose }) {
         <Text style={styles.subtitle}>
           You and {profile.first_name} like each other.
         </Text>
+        <Text style={styles.firstMove}>{firstMoveText}</Text>
 
         <View style={styles.photos}>
           <Image
@@ -27,7 +38,9 @@ export default function MatchModal({ match, myPhoto, onMessage, onClose }) {
         </View>
 
         <Pressable style={styles.primaryButton} onPress={onMessage}>
-          <Text style={styles.primaryText}>Send a message</Text>
+          <Text style={styles.primaryText}>
+            {role === "them" ? "Open chat" : "Send a message"}
+          </Text>
         </Pressable>
         <Pressable style={styles.secondaryButton} onPress={onClose}>
           <Text style={styles.secondaryText}>Keep swiping</Text>
@@ -54,6 +67,18 @@ const styles = StyleSheet.create({
     color: "#fff",
     marginTop: 8,
     textAlign: "center",
+  },
+  firstMove: {
+    fontSize: 14,
+    color: "#fff",
+    fontWeight: "700",
+    marginTop: 10,
+    textAlign: "center",
+    backgroundColor: "rgba(255,255,255,0.18)",
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    overflow: "hidden",
   },
   photos: {
     flexDirection: "row",

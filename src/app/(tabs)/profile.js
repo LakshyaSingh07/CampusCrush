@@ -13,7 +13,9 @@ import {
   View,
 } from "react-native";
 import ProfileCard from "../../components/ProfileCard";
+import ProfileDetails from "../../components/ProfileDetails";
 import { useAuth } from "../../context/AuthProvider";
+import { useEntitlements } from "../../context/EntitlementsProvider";
 import { unregisterPushToken } from "../../lib/notifications";
 import { toPublicProfile } from "../../lib/profile";
 import { supabase } from "../../lib/supabase";
@@ -23,8 +25,11 @@ export default function ProfileScreen() {
   const { profile, user, updateProfile } = useAuth();
   const [deleting, setDeleting] = useState(false);
   const [savingPause, setSavingPause] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const { is_premium, premium_until } = useEntitlements();
 
   if (!profile) return null;
+  const publicProfile = toPublicProfile(profile);
 
   const togglePause = async (isPaused) => {
     setSavingPause(true);
@@ -82,8 +87,32 @@ export default function ProfileScreen() {
         <Text style={styles.title}>Profile</Text>
         <Text style={styles.email}>{user?.email}</Text>
 
+        <Pressable style={styles.premiumCard} onPress={() => router.push("/premium")}>
+          <FontAwesome5 name="crown" size={22} color="#f08c00" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.premiumTitle}>
+              {is_premium ? "CampusCrush Premium" : "Get CampusCrush Premium"}
+            </Text>
+            <Text style={styles.premiumText}>
+              {is_premium
+                ? `Active until ${new Date(premium_until).toLocaleDateString([], { day: "numeric", month: "short" })}`
+                : "See who likes you, unlimited swipes and matches. From ₹9."}
+            </Text>
+          </View>
+          <FontAwesome5 name="chevron-right" size={14} color="#e67700" />
+        </Pressable>
+
         <Text style={styles.sectionTitle}>How others see you</Text>
-        <ProfileCard profile={toPublicProfile(profile)} style={styles.preview} />
+        <ProfileCard
+          profile={publicProfile}
+          style={styles.preview}
+          onInfoPress={() => setPreviewVisible(true)}
+        />
+        <ProfileDetails
+          profile={publicProfile}
+          visible={previewVisible}
+          onClose={() => setPreviewVisible(false)}
+        />
 
         <Pressable style={styles.primaryButton} onPress={() => router.push("/edit-profile")}>
           <FontAwesome5 name="pen" size={14} color="#fff" />
@@ -167,6 +196,25 @@ const styles = StyleSheet.create({
   },
   preview: {
     height: 460,
+  },
+  premiumCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: "#fff4e6",
+    borderRadius: 14,
+    padding: 16,
+    marginTop: 18,
+  },
+  premiumTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#d9480f",
+  },
+  premiumText: {
+    fontSize: 13,
+    color: "#e8590c",
+    marginTop: 2,
   },
   primaryButton: {
     flexDirection: "row",
