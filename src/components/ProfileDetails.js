@@ -1,13 +1,22 @@
 import { FontAwesome5 } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
-import { Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Modal, ScrollView, View } from "react-native";
+import Animated from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { resizedImageUrl } from "../lib/cloudinary";
 import { goalFor, LIFESTYLE_FIELDS } from "../lib/profileOptions";
+import { makeStyles, useTheme } from "../theme";
+import { AppText, enter, IconButton } from "../ui";
 import Chip from "./Chip";
 
 // Full scrollable profile, Bumble-style: photos interleaved with prompts,
-// interests and lifestyle. `footer` renders below (e.g. like/pass buttons).
+// interests and lifestyle. `footer` renders pinned at the bottom (e.g.
+// like/pass buttons).
 export default function ProfileDetails({ profile, visible, onClose, footer }) {
+  const t = useTheme();
+  const styles = useStyles();
+  const insets = useSafeAreaInsets();
   if (!profile) return null;
 
   const photos = profile.photos ?? [];
@@ -18,88 +27,95 @@ export default function ProfileDetails({ profile, visible, onClose, footer }) {
   );
   const basics = [
     profile.department && { icon: "graduation-cap", text: profile.department },
-    profile.grad_year && { icon: "calendar", text: `Class of ${profile.grad_year}` },
+    profile.grad_year && { icon: "calendar-alt", text: `Class of ${profile.grad_year}` },
     profile.height_cm && { icon: "ruler-vertical", text: `${profile.height_cm} cm` },
     profile.hometown && { icon: "home", text: profile.hometown },
   ].filter(Boolean);
 
+  let section = 0;
+  const next = () => enter(section++);
+
   const Photo = ({ index }) =>
     photos[index] ? (
-      <Image
-        source={{ uri: resizedImageUrl(photos[index], 900) }}
-        style={styles.photo}
-        contentFit="cover"
-      />
+      <Animated.View entering={next()}>
+        <Image source={{ uri: resizedImageUrl(photos[index], 900) }} style={styles.photo} contentFit="cover" transition={200} />
+      </Animated.View>
     ) : null;
 
   const Prompt = ({ index }) =>
     prompts[index] ? (
-      <View style={styles.card}>
-        <Text style={styles.promptQuestion}>{prompts[index].prompt}</Text>
-        <Text style={styles.promptAnswer}>{prompts[index].answer}</Text>
-      </View>
+      <Animated.View entering={next()} style={styles.card}>
+        <AppText variant="caption" color="primaryPressed" style={{ marginBottom: 6 }}>
+          {prompts[index].prompt}
+        </AppText>
+        <AppText variant="h2" style={{ lineHeight: 30 }}>
+          {prompts[index].answer}
+        </AppText>
+      </Animated.View>
     ) : null;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={styles.container}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <Text style={styles.headerName}>
+          <AppText variant="h1">
             {profile.first_name}
-            {profile.age ? `, ${profile.age}` : ""}
-          </Text>
-          <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Close profile">
-            <FontAwesome5 name="chevron-down" size={22} color="#212529" />
-          </Pressable>
+            {profile.age ? <AppText variant="h2" color="textSecondary">{`  ${profile.age}`}</AppText> : null}
+          </AppText>
+          <IconButton icon="chevron-down" size={40} background="surfaceAlt" onPress={onClose} accessibilityLabel="Close profile" />
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: footer ? 140 : insets.bottom + 32 }]} showsVerticalScrollIndicator={false}>
           <Photo index={0} />
 
-          <View style={styles.card}>
+          <Animated.View entering={next()} style={styles.card}>
             {goal && (
               <View style={styles.goal}>
-                <Text style={styles.goalText}>
+                <AppText variant="caption" color="onPrimary">
                   {goal.emoji} Looking for {goal.label.toLowerCase()}
-                </Text>
+                </AppText>
               </View>
             )}
             {basics.map((b) => (
               <View key={b.icon} style={styles.basicRow}>
-                <FontAwesome5 name={b.icon} size={14} color="#6c757d" />
-                <Text style={styles.basicText}>{b.text}</Text>
+                <FontAwesome5 name={b.icon} size={14} color={t.colors.textSecondary} />
+                <AppText variant="bodyMedium">{b.text}</AppText>
               </View>
             ))}
-            {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
-          </View>
+            {profile.bio ? <AppText style={{ marginTop: 12 }}>{profile.bio}</AppText> : null}
+          </Animated.View>
 
           <Prompt index={0} />
           <Photo index={1} />
 
           {profile.interests?.length > 0 && (
-            <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Interests</Text>
+            <Animated.View entering={next()} style={styles.card}>
+              <AppText variant="label" color="textSecondary" style={{ marginBottom: 12 }}>
+                Interests
+              </AppText>
               <View style={styles.wrap}>
                 {profile.interests.map((tag) => (
                   <Chip key={tag} label={tag} />
                 ))}
               </View>
-            </View>
+            </Animated.View>
           )}
 
           <Prompt index={1} />
           <Photo index={2} />
 
           {lifestyle.length > 0 && (
-            <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Lifestyle</Text>
+            <Animated.View entering={next()} style={styles.card}>
+              <AppText variant="label" color="textSecondary" style={{ marginBottom: 8 }}>
+                Lifestyle
+              </AppText>
               {lifestyle.map((f) => (
                 <View key={f.key} style={styles.basicRow}>
-                  <FontAwesome5 name={f.icon} size={14} color="#6c757d" />
-                  <Text style={styles.basicText}>{f.value}</Text>
+                  <FontAwesome5 name={f.icon} size={14} color={t.colors.textSecondary} />
+                  <AppText variant="bodyMedium">{f.value}</AppText>
                 </View>
               ))}
-            </View>
+            </Animated.View>
           )}
 
           <Prompt index={2} />
@@ -108,98 +124,72 @@ export default function ProfileDetails({ profile, visible, onClose, footer }) {
           ))}
         </ScrollView>
 
-        {footer}
-      </SafeAreaView>
+        {footer ? (
+          <BlurView
+            intensity={60}
+            tint={t.dark ? "dark" : "light"}
+            style={[styles.footer, { paddingBottom: insets.bottom + 8 }]}
+          >
+            {footer}
+          </BlurView>
+        ) : null}
+      </View>
     </Modal>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((t) => ({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: t.colors.bg,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 12,
-    backgroundColor: "#fff",
-  },
-  headerName: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#212529",
+    paddingHorizontal: t.spacing.xl,
+    paddingVertical: t.spacing.md,
   },
   content: {
-    padding: 12,
-    gap: 12,
-    paddingBottom: 40,
+    paddingHorizontal: t.spacing.md,
+    gap: t.spacing.md,
   },
   photo: {
     width: "100%",
     aspectRatio: 3 / 4,
-    borderRadius: 16,
-    backgroundColor: "#e9ecef",
+    borderRadius: t.radius.xl,
+    backgroundColor: t.colors.surfaceAlt,
   },
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 18,
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radius.xl,
+    padding: t.spacing.xl,
   },
   goal: {
     alignSelf: "flex-start",
-    backgroundColor: "#f3f0ff",
-    borderRadius: 16,
+    backgroundColor: t.colors.primary,
+    borderRadius: t.radius.pill,
     paddingVertical: 6,
     paddingHorizontal: 12,
     marginBottom: 12,
   },
-  goalText: {
-    color: "#5f3dc4",
-    fontWeight: "600",
-  },
   basicRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingVertical: 4,
-  },
-  basicText: {
-    fontSize: 15,
-    color: "#343a40",
-  },
-  bio: {
-    fontSize: 16,
-    lineHeight: 23,
-    color: "#212529",
-    marginTop: 10,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#7B61FF",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 10,
+    gap: 12,
+    paddingVertical: 5,
   },
   wrap: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
   },
-  promptQuestion: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#7B61FF",
-    marginBottom: 6,
+  footer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: 8,
+    overflow: "hidden",
   },
-  promptAnswer: {
-    fontSize: 22,
-    fontWeight: "600",
-    color: "#212529",
-    lineHeight: 30,
-  },
-});
+}));

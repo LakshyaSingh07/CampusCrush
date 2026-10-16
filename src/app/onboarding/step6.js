@@ -1,9 +1,12 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, View } from "react-native";
+import Animated from "react-native-reanimated";
+import ChoiceCard from "../../components/ChoiceCard";
 import OnboardingStepLayout from "../../components/OnboardingStepLayout";
 import { useAuth } from "../../context/AuthProvider";
 import { RELATIONSHIP_GOALS } from "../../lib/profileOptions";
+import { enter } from "../../ui";
 
 export default function OnboardingGoal() {
   const router = useRouter();
@@ -29,48 +32,17 @@ export default function OnboardingGoal() {
       onNext={handleNext}
     >
       <View style={{ gap: 12 }}>
-        {RELATIONSHIP_GOALS.map((option) => {
-          const active = goal === option.value;
-          return (
-            <Pressable
-              key={option.value}
-              style={[styles.option, active && styles.optionActive]}
+        {RELATIONSHIP_GOALS.map((option, i) => (
+          <Animated.View key={option.value} entering={enter(i + 1)}>
+            <ChoiceCard
+              label={option.label}
+              emoji={option.emoji}
+              selected={goal === option.value}
               onPress={() => setGoal(option.value)}
-            >
-              <Text style={styles.emoji}>{option.emoji}</Text>
-              <Text style={[styles.label, active && styles.labelActive]}>{option.label}</Text>
-            </Pressable>
-          );
-        })}
+            />
+          </Animated.View>
+        ))}
       </View>
     </OnboardingStepLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  option: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-    borderRadius: 14,
-    paddingVertical: 18,
-    paddingHorizontal: 18,
-  },
-  optionActive: {
-    borderColor: "#7B61FF",
-    backgroundColor: "#f3f0ff",
-  },
-  emoji: {
-    fontSize: 24,
-  },
-  label: {
-    fontSize: 17,
-    color: "#212529",
-  },
-  labelActive: {
-    fontWeight: "700",
-    color: "#5f3dc4",
-  },
-});

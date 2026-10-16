@@ -2,26 +2,35 @@ import { FontAwesome5 } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { resizedImageUrl } from "../lib/cloudinary";
 import { goalFor } from "../lib/profileOptions";
+import { makeStyles, useTheme } from "../theme";
+import { AppText, haptics, IconButton } from "../ui";
 
 // Full-bleed profile card. Tap the left/right half to move between photos.
 // `profile` uses the public shape returned by the discovery/match RPCs.
-// `onInfoPress` shows an "i" button that opens the full profile.
+// `onInfoPress` shows a button that opens the full profile.
 export default function ProfileCard({ profile, style, onMorePress, onInfoPress }) {
+  const t = useTheme();
+  const styles = useStyles();
   const goal = goalFor(profile.relationship_goal);
   const photos = profile.photos ?? [];
   const [index, setIndex] = useState(0);
 
   useEffect(() => setIndex(0), [profile.user_id]);
 
-  const showPrev = () => setIndex((i) => Math.max(i - 1, 0));
-  const showNext = () => setIndex((i) => Math.min(i + 1, photos.length - 1));
+  const go = (delta) => {
+    const next = Math.min(Math.max(index + delta, 0), photos.length - 1);
+    if (next !== index) {
+      haptics.select();
+      setIndex(next);
+    }
+  };
 
   const details = [
     profile.department,
-    profile.grad_year && `Class of ${profile.grad_year}`,
+    profile.grad_year && `’${String(profile.grad_year).slice(2)}`,
     profile.height_cm && `${profile.height_cm} cm`,
   ].filter(Boolean);
 
@@ -32,95 +41,99 @@ export default function ProfileCard({ profile, style, onMorePress, onInfoPress }
           source={{ uri: resizedImageUrl(photos[index], 800) }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
-          transition={150}
+          transition={180}
         />
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.noPhoto]}>
-          <FontAwesome5 name="user" size={64} color="#adb5bd" />
+          <FontAwesome5 name="user" size={64} color={t.colors.textMuted} />
         </View>
       )}
 
       {photos.length > 1 && (
         <View style={styles.indicators}>
           {photos.map((_, i) => (
-            <View
-              key={i}
-              style={[styles.indicator, i === index && styles.indicatorActive]}
-            />
+            <View key={i} style={[styles.indicator, i === index && styles.indicatorActive]} />
           ))}
         </View>
       )}
 
       <View style={styles.tapZones}>
-        <Pressable style={styles.tapZone} onPress={showPrev} />
-        <Pressable style={styles.tapZone} onPress={showNext} />
+        <Pressable style={{ flex: 1 }} onPress={() => go(-1)} accessibilityLabel="Previous photo" />
+        <Pressable style={{ flex: 1 }} onPress={() => go(1)} accessibilityLabel="Next photo" />
       </View>
 
-      <LinearGradient
-        colors={["transparent", "rgba(0,0,0,0.85)"]}
-        style={styles.info}
-        pointerEvents="none"
-      >
+      <LinearGradient colors={t.gradients.photoFade} style={styles.info} pointerEvents="none">
         {goal && (
           <View style={styles.goal}>
-            <Text style={styles.goalText}>
+            <AppText variant="caption" color="#1E1A12">
               {goal.emoji} {goal.label}
-            </Text>
+            </AppText>
           </View>
         )}
-        <Text style={styles.name}>
+        <AppText variant="h1" color="#FFFFFF" style={styles.name}>
           {profile.first_name}
-          {profile.age ? `, ${profile.age}` : ""}
-        </Text>
+          <AppText variant="h2" color="rgba(255,255,255,0.85)">
+            {profile.age ? `  ${profile.age}` : ""}
+          </AppText>
+        </AppText>
         {details.length > 0 && (
-          <Text style={styles.details}>{details.join(" · ")}</Text>
+          <AppText variant="bodyMedium" color="rgba(255,255,255,0.9)" style={{ marginTop: 2 }}>
+            {details.join("  ·  ")}
+          </AppText>
         )}
         {profile.interests?.length > 0 && (
           <View style={styles.tags}>
             {profile.interests.slice(0, 3).map((tag) => (
-              <Text key={tag} style={styles.tag}>
-                {tag}
-              </Text>
+              <View key={tag} style={styles.tag}>
+                <AppText variant="caption" color="#FFFFFF">
+                  {tag}
+                </AppText>
+              </View>
             ))}
           </View>
         )}
         {profile.bio ? (
-          <Text style={styles.bio} numberOfLines={2}>
+          <AppText variant="body" color="rgba(255,255,255,0.92)" numberOfLines={2} style={{ marginTop: 10 }}>
             {profile.bio}
-          </Text>
+          </AppText>
         ) : null}
       </LinearGradient>
 
       {onInfoPress && (
-        <Pressable
-          style={styles.infoButton}
+        <IconButton
+          icon="chevron-up"
+          size={40}
+          iconSize={16}
+          background="#FFFFFF"
+          color="#1E1A12"
+          elevated
           onPress={onInfoPress}
-          hitSlop={10}
+          style={styles.infoButton}
           accessibilityLabel="View full profile"
-        >
-          <FontAwesome5 name="chevron-up" size={16} color="#212529" />
-        </Pressable>
+        />
       )}
 
       {onMorePress && (
-        <Pressable
-          style={styles.moreButton}
+        <IconButton
+          icon="ellipsis-h"
+          size={36}
+          iconSize={15}
+          background="rgba(0,0,0,0.35)"
+          color="#FFFFFF"
           onPress={onMorePress}
-          hitSlop={10}
+          style={styles.moreButton}
           accessibilityLabel="More options"
-        >
-          <FontAwesome5 name="ellipsis-h" size={16} color="#fff" />
-        </Pressable>
+        />
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((t) => ({
   card: {
-    borderRadius: 20,
+    borderRadius: 28,
     overflow: "hidden",
-    backgroundColor: "#e9ecef",
+    backgroundColor: t.colors.surfaceAlt,
   },
   noPhoto: {
     justifyContent: "center",
@@ -128,11 +141,11 @@ const styles = StyleSheet.create({
   },
   indicators: {
     position: "absolute",
-    top: 10,
-    left: 10,
-    right: 10,
+    top: 12,
+    left: 14,
+    right: 14,
     flexDirection: "row",
-    gap: 4,
+    gap: 5,
   },
   indicator: {
     flex: 1,
@@ -141,89 +154,56 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.4)",
   },
   indicatorActive: {
-    backgroundColor: "#fff",
+    backgroundColor: "#FFFFFF",
   },
   tapZones: {
     ...StyleSheet.absoluteFillObject,
     flexDirection: "row",
-  },
-  tapZone: {
-    flex: 1,
   },
   info: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-  },
-  name: {
-    color: "#fff",
-    fontSize: 30,
-    fontWeight: "bold",
-  },
-  details: {
-    color: "#f1f3f5",
-    fontSize: 15,
-    marginTop: 4,
-  },
-  bio: {
-    color: "#f8f9fa",
-    fontSize: 15,
-    marginTop: 10,
-    lineHeight: 21,
+    paddingHorizontal: 22,
+    paddingTop: 90,
+    paddingBottom: 24,
   },
   goal: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(255,255,255,0.9)",
-    borderRadius: 14,
+    backgroundColor: t.colors.primary,
+    borderRadius: t.radius.pill,
     paddingVertical: 4,
-    paddingHorizontal: 10,
-    marginBottom: 8,
+    paddingHorizontal: 12,
+    marginBottom: 10,
   },
-  goalText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#5f3dc4",
+  name: {
+    fontSize: 32,
+    lineHeight: 38,
   },
   tags: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6,
-    marginTop: 10,
+    marginTop: 12,
+    paddingRight: 48,
   },
   tag: {
-    color: "#fff",
-    fontSize: 13,
+    borderRadius: t.radius.pill,
+    paddingVertical: 4,
+    paddingHorizontal: 11,
+    backgroundColor: "rgba(255,255,255,0.18)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.6)",
-    borderRadius: 14,
-    paddingVertical: 3,
-    paddingHorizontal: 10,
-    overflow: "hidden",
+    borderColor: "rgba(255,255,255,0.35)",
   },
   infoButton: {
     position: "absolute",
-    right: 16,
-    bottom: 20,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "#fff",
-    justifyContent: "center",
-    alignItems: "center",
+    right: 18,
+    bottom: 24,
   },
   moreButton: {
     position: "absolute",
-    top: 24,
+    top: 26,
     right: 14,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    justifyContent: "center",
-    alignItems: "center",
   },
-});
+}));

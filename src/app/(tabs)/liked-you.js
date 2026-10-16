@@ -3,16 +3,8 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Alert, FlatList, RefreshControl, View } from "react-native";
+import Animated from "react-native-reanimated";
 import MatchModal from "../../components/MatchModal";
 import ProfileDetails from "../../components/ProfileDetails";
 import SafetyMenu from "../../components/SafetyMenu";
@@ -22,18 +14,22 @@ import { resizedImageUrl } from "../../lib/cloudinary";
 import { openChat } from "../../lib/navigation";
 import { LIMIT_ERRORS } from "../../lib/premium";
 import { supabase } from "../../lib/supabase";
+import { makeStyles, useTheme } from "../../theme";
+import { AppText, Button, EmptyState, enter, IconButton, PressableScale, Screen, Skeleton } from "../../ui";
 
 // Free users only get the count, never the profiles, so there's nothing to
 // "un-blur". These tiles are placeholders.
-const LOCKED_TILE_COLORS = [
-  ["#d0bfff", "#faa2c1"],
-  ["#a5d8ff", "#d0bfff"],
-  ["#ffc9c9", "#ffd8a8"],
-  ["#c3fae8", "#a5d8ff"],
+const LOCKED_TILES = [
+  ["#FFE08A", "#FFB88C"],
+  ["#FFD3B6", "#FFE08A"],
+  ["#FFC2A8", "#FFE5A3"],
+  ["#FFE9B0", "#FFC8A2"],
 ];
 
 export default function LikedYouScreen() {
   const router = useRouter();
+  const t = useTheme();
+  const styles = useStyles();
   const { profile: myProfile } = useAuth();
   const { is_premium, liked_me_count, refresh: refreshEntitlements } = useEntitlements();
   const [likes, setLikes] = useState([]);
@@ -67,16 +63,12 @@ export default function LikedYouScreen() {
     }, [loadLikes])
   );
 
-  const removeLike = (userId) =>
-    setLikes((prev) => prev.filter((p) => p.user_id !== userId));
+  const removeLike = (userId) => setLikes((prev) => prev.filter((p) => p.user_id !== userId));
 
   const respond = async (direction) => {
     if (!selected || swiping) return;
     setSwiping(true);
-    const { data, error } = await supabase.rpc("swipe", {
-      p_target: selected.user_id,
-      p_direction: direction,
-    });
+    const { data, error } = await supabase.rpc("swipe", { p_target: selected.user_id, p_direction: direction });
     setSwiping(false);
     if (error) {
       const limit = LIMIT_ERRORS[error.message];
@@ -92,67 +84,66 @@ export default function LikedYouScreen() {
     removeLike(person.user_id);
     setSelected(null);
     refreshEntitlements();
-    if (data?.[0]?.matched) {
-      setMatch({ profile: person, matchId: data[0].match_id });
-    }
+    if (data?.[0]?.matched) setMatch({ profile: person, matchId: data[0].match_id });
   };
 
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#7B61FF" />
-      </View>
-    );
-  }
-
   const header = (
-    <View style={styles.header}>
-      <Text style={styles.title}>Liked You</Text>
-      <Text style={styles.subtitle}>
+    <Animated.View entering={enter(0)} style={styles.header}>
+      <AppText variant="h1">Liked You</AppText>
+      <AppText color="textSecondary" style={{ marginTop: 4 }}>
         {liked_me_count > 0
           ? `${liked_me_count} ${liked_me_count === 1 ? "person likes" : "people like"} you.${is_premium ? " Like them back to match." : ""}`
           : "People who like you will show up here."}
-      </Text>
-    </View>
+      </AppText>
+    </Animated.View>
   );
+
+  if (loading) {
+    return (
+      <Screen edges={["top"]}>
+        {header}
+        <View style={styles.skeletonGrid}>
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} width="48%" height={220} radius={20} />
+          ))}
+        </View>
+      </Screen>
+    );
+  }
 
   if (!is_premium) {
     return (
-      <SafeAreaView style={styles.container}>
+      <Screen edges={["top"]}>
         {header}
         {liked_me_count > 0 ? (
           <View style={styles.lockedWrap}>
             <View style={styles.lockedGrid}>
               {Array.from({ length: Math.min(liked_me_count, 4) }, (_, i) => (
-                <LinearGradient
-                  key={i}
-                  colors={LOCKED_TILE_COLORS[i % LOCKED_TILE_COLORS.length]}
-                  style={styles.lockedTile}
-                >
-                  <FontAwesome5 name="lock" size={22} color="rgba(255,255,255,0.9)" />
-                </LinearGradient>
+                <Animated.View key={i} entering={enter(i + 1)} style={styles.tileWrap}>
+                  <LinearGradient colors={LOCKED_TILES[i % LOCKED_TILES.length]} style={styles.lockedTile}>
+                    <View style={styles.lockCircle}>
+                      <FontAwesome5 name="lock" size={18} color="#1E1A12" />
+                    </View>
+                  </LinearGradient>
+                </Animated.View>
               ))}
             </View>
-            <Pressable style={styles.unlockButton} onPress={() => openPaywall("likes")}>
-              <FontAwesome5 name="crown" size={16} color="#ffd43b" />
-              <Text style={styles.unlockText}>See who likes you</Text>
-            </Pressable>
-            <Text style={styles.lockedHint}>
-              Or keep swiping on Discover. If you like them too, it&apos;s a match.
-            </Text>
+            <Animated.View entering={enter(6)} style={{ alignSelf: "stretch", marginTop: 24 }}>
+              <Button title="See who likes you" icon="crown" onPress={() => openPaywall("likes")} haptic="medium" />
+              <AppText variant="caption" color="textSecondary" style={styles.lockedHint}>
+                Or keep swiping on Discover. If you like them too, it&apos;s a match.
+              </AppText>
+            </Animated.View>
           </View>
         ) : (
-          <View style={styles.empty}>
-            <FontAwesome5 name="heart" size={48} color="#dee2e6" />
-            <Text style={styles.emptyText}>No likes yet. Keep swiping on Discover!</Text>
-          </View>
+          <EmptyState emoji="💛" title="No likes yet" text="Keep swiping on Discover. Likes show up here the moment they happen." />
         )}
-      </SafeAreaView>
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Screen edges={["top"]}>
       <FlatList
         data={likes}
         keyExtractor={(item) => item.user_id}
@@ -160,33 +151,34 @@ export default function LikedYouScreen() {
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.list}
         ListHeaderComponent={header}
-        refreshing={refreshing}
-        onRefresh={() => {
-          setRefreshing(true);
-          loadLikes();
-        }}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <FontAwesome5 name="heart" size={48} color="#dee2e6" />
-            <Text style={styles.emptyText}>No likes yet. Keep swiping on Discover!</Text>
-          </View>
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={t.colors.primaryPressed}
+            colors={[t.colors.primaryPressed]}
+            onRefresh={() => {
+              setRefreshing(true);
+              loadLikes();
+            }}
+          />
         }
-        renderItem={({ item }) => (
-          <Pressable style={styles.tile} onPress={() => setSelected(item)}>
-            <Image
-              source={{ uri: resizedImageUrl(item.photos?.[0], 400) }}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-            />
-            <LinearGradient colors={["transparent", "rgba(0,0,0,0.75)"]} style={styles.tileInfo}>
-              <Text style={styles.tileName}>
-                {item.first_name}, {item.age}
-              </Text>
-              <Text style={styles.tileDept} numberOfLines={1}>
-                {item.department}
-              </Text>
-            </LinearGradient>
-          </Pressable>
+        ListEmptyComponent={
+          <EmptyState emoji="💛" title="No likes yet" text="Keep swiping on Discover. Likes show up here the moment they happen." />
+        }
+        renderItem={({ item, index }) => (
+          <Animated.View entering={enter(index)} style={styles.tileWrap}>
+            <PressableScale style={styles.tile} onPress={() => setSelected(item)} haptic="light" scaleTo={0.96}>
+              <Image source={{ uri: resizedImageUrl(item.photos?.[0], 400) }} style={{ flex: 1 }} contentFit="cover" transition={200} />
+              <LinearGradient colors={t.gradients.photoFade} style={styles.tileInfo}>
+                <AppText variant="title" color="#FFFFFF">
+                  {item.first_name}, {item.age}
+                </AppText>
+                <AppText variant="small" color="rgba(255,255,255,0.85)" numberOfLines={1}>
+                  {item.department}
+                </AppText>
+              </LinearGradient>
+            </PressableScale>
+          </Animated.View>
         )}
       />
 
@@ -197,33 +189,20 @@ export default function LikedYouScreen() {
         footer={
           selected && (
             <View style={styles.actions}>
-              <Pressable
-                style={[styles.actionButton, styles.smallButton]}
-                onPress={() => setMenuVisible(true)}
-                accessibilityLabel="More options"
-              >
-                <FontAwesome5 name="ellipsis-h" size={18} color="#495057" />
-              </Pressable>
-              <Pressable
-                style={[styles.actionButton, styles.passButton]}
-                onPress={() => respond("pass")}
-                disabled={swiping}
-                accessibilityLabel="Pass"
-              >
-                <FontAwesome5 name="times" size={28} color="#e03131" />
-              </Pressable>
-              <Pressable
-                style={[styles.actionButton, styles.likeButton]}
+              <IconButton icon="ellipsis-h" size={48} iconSize={17} background="surface" elevated onPress={() => setMenuVisible(true)} accessibilityLabel="More options" />
+              <IconButton icon="times" size={64} iconSize={26} color="pass" background="surface" elevated onPress={() => respond("pass")} disabled={swiping} accessibilityLabel="Pass" />
+              <IconButton
+                icon="heart"
+                size={72}
+                iconSize={30}
+                color="onPrimary"
+                background="primary"
+                elevated
+                haptic="medium"
+                loading={swiping}
                 onPress={() => respond("like")}
-                disabled={swiping}
                 accessibilityLabel="Like back"
-              >
-                {swiping ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <FontAwesome5 name="heart" solid size={28} color="#fff" />
-                )}
-              </Pressable>
+              />
               <SafetyMenu
                 visible={menuVisible}
                 onClose={() => setMenuVisible(false)}
@@ -250,37 +229,25 @@ export default function LikedYouScreen() {
           openChat(router, matchId, profile);
         }}
       />
-    </SafeAreaView>
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+const useStyles = makeStyles((t) => ({
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 12,
+    paddingHorizontal: t.spacing.xl,
+    paddingTop: t.spacing.sm,
+    paddingBottom: t.spacing.lg,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#212529",
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#6c757d",
-    marginTop: 4,
+  skeletonGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: t.spacing.md,
+    paddingHorizontal: t.spacing.md,
   },
   lockedWrap: {
-    paddingHorizontal: 20,
+    paddingHorizontal: t.spacing.md,
     alignItems: "center",
   },
   lockedGrid: {
@@ -288,112 +255,57 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "space-between",
     width: "100%",
-    rowGap: 12,
+    rowGap: t.spacing.md,
+  },
+  tileWrap: {
+    width: "48.5%",
   },
   lockedTile: {
-    width: "48.5%",
     aspectRatio: 3 / 4,
-    borderRadius: 14,
+    borderRadius: t.radius.lg,
     justifyContent: "center",
     alignItems: "center",
   },
-  unlockButton: {
-    flexDirection: "row",
+  lockCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.65)",
+    justifyContent: "center",
     alignItems: "center",
-    gap: 10,
-    backgroundColor: "#7B61FF",
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 30,
-    marginTop: 24,
-  },
-  unlockText: {
-    color: "#fff",
-    fontSize: 17,
-    fontWeight: "700",
   },
   lockedHint: {
-    fontSize: 13,
-    color: "#868e96",
     textAlign: "center",
-    marginTop: 12,
+    marginTop: t.spacing.md,
   },
   list: {
-    paddingHorizontal: 12,
-    paddingBottom: 24,
+    paddingHorizontal: t.spacing.md,
+    paddingBottom: t.spacing.xxl,
     flexGrow: 1,
   },
   row: {
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: t.spacing.md,
   },
   tile: {
-    // Fixed width so a lone tile in the last row doesn't stretch
-    width: "48.5%",
     aspectRatio: 3 / 4,
-    borderRadius: 14,
+    borderRadius: t.radius.lg,
     overflow: "hidden",
-    backgroundColor: "#e9ecef",
+    backgroundColor: t.colors.surfaceAlt,
   },
   tileInfo: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    padding: 10,
-    paddingTop: 30,
-  },
-  tileName: {
-    color: "#fff",
-    fontSize: 17,
-    fontWeight: "bold",
-  },
-  tileDept: {
-    color: "#f1f3f5",
-    fontSize: 12,
-  },
-  empty: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 32,
-  },
-  emptyText: {
-    fontSize: 15,
-    color: "#6c757d",
-    marginTop: 16,
-    textAlign: "center",
+    padding: t.spacing.md,
+    paddingTop: 36,
   },
   actions: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 28,
-    paddingVertical: 16,
-    backgroundColor: "#fff",
+    gap: t.spacing.xxl,
+    paddingVertical: t.spacing.sm,
   },
-  actionButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  smallButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#fff",
-  },
-  passButton: {
-    backgroundColor: "#fff",
-  },
-  likeButton: {
-    backgroundColor: "#7B61FF",
-  },
-});
+}));

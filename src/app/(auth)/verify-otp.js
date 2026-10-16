@@ -1,370 +1,218 @@
-import { FontAwesome5 } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Animated,
-  Easing,
-  Image,
-  Keyboard,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableWithoutFeedback,
-  View,
-} from "react-native";
-import CustomAlert from "../../components/CustomAlert";
+import { Pressable, TextInput, View } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { supabase } from "../../lib/supabase";
+import { makeStyles, useTheme } from "../../theme";
+import { AppText, Button, enter, haptics, IconButton, PressableScale, Screen, SPRING } from "../../ui";
 
-const initialAlertState = {
-  visible: false,
-  title: "",
-  message: "",
-  buttons: [],
-};
+const CODE_LENGTH = 6;
+const RESEND_SECONDS = 60;
 
-export default function VerifyOTPScreen() {
-  const router = useRouter();
-  const { email } = useLocalSearchParams();
-  const [otp, setOtp] = useState(new Array(6).fill("")); // Store OTP as an array
-  const [loading, setLoading] = useState(false);
-  const [alert, setAlert] = useState(initialAlertState);
-
-  // NEW: State for the countdown timer
-  const [countdown, setCountdown] = useState(60);
-  const [isTimerActive, setIsTimerActive] = useState(true);
-
-  const inputs = useRef([]); // Refs for each OTP input
-
-  const cardTranslateY = useRef(new Animated.Value(0)).current;
+function CodeBox({ digit, active, error }) {
+  const styles = useStyles();
+  const scale = useSharedValue(1);
 
   useEffect(() => {
-    const keyboardShowListener = Keyboard.addListener(
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
-      (event) => {
-        Animated.timing(cardTranslateY, {
-          toValue: -event.endCoordinates.height / 1.5, // Adjust this for how far up you want the card to move
-          duration: 300,
-          useNativeDriver: true,
-          easing: Easing.inOut(Easing.ease),
-        }).start();
-      }
-    );
+    if (digit) scale.value = withSequence(withTiming(1.12, { duration: 90 }), withSpring(1, SPRING));
+  }, [digit, scale]);
 
-    const keyboardHideListener = Keyboard.addListener(
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
-      () => {
-        Animated.timing(cardTranslateY, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: true,
-          easing: Easing.inOut(Easing.ease),
-        }).start();
-      }
-    );
-
-    return () => {
-      keyboardShowListener.remove();
-      keyboardHideListener.remove();
-    };
-  }, [cardTranslateY]);
-
-  // NEW: useEffect to handle the countdown timer
-  useEffect(() => {
-    // Don't start the timer until the component is ready
-    if (!isTimerActive) return;
-
-    // If countdown reaches 0, stop the timer
-    if (countdown === 0) {
-      setIsTimerActive(false);
-      return;
-    }
-
-    // Set up an interval to decrement the countdown every second
-    const intervalId = setInterval(() => {
-      setCountdown((prev) => prev - 1);
-    }, 1000);
-
-    // Clean up the interval when the component unmounts or countdown changes
-    return () => clearInterval(intervalId);
-  }, [countdown, isTimerActive]);
-
-  const handleChange = (text, index) => {
-    if (isNaN(text)) return; // Only allow numbers
-    const newOtp = [...otp];
-    newOtp[index] = text;
-    setOtp(newOtp);
-
-    // Move to next input if a digit is entered
-    if (text && index < 5) {
-      inputs.current[index + 1].focus();
-    }
-  };
-
-  const handleKeyPress = ({ nativeEvent: { key } }, index) => {
-    // Move to previous input on backspace
-    if (key === "Backspace" && !otp[index] && index > 0) {
-      inputs.current[index - 1].focus();
-    }
-  };
-
-  const verifyOtp = async () => {
-    const token = otp.join("");
-    if (token.length !== 6) {
-      setAlert({
-        visible: true,
-        title: "Invalid Code",
-        message: "Please enter all 6 digits of the code.",
-        buttons: [
-          {
-            text: "OK",
-            onPress: () => setAlert(initialAlertState),
-            style: "primary",
-          },
-        ],
-      });
-      return;
-    }
-
-    Keyboard.dismiss();
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.verifyOtp({
-        email: email,
-        token: token,
-        type: "email",
-      });
-
-      if (error) {
-        setAlert({
-          visible: true,
-          title: "Error",
-          message: error.message,
-          buttons: [
-            {
-              text: "OK",
-              onPress: () => setAlert(initialAlertState),
-              style: "primary",
-            },
-          ],
-        });
-      }
-      // On success, AuthProvider picks up the new session and the guard in
-      // _layout.js routes to the right onboarding step or to home.
-    } catch (_e) {
-      // ... same catch block as before ...
-      setAlert({
-        visible: true,
-        title: "Error",
-        message: "An unexpected error occurred. Please try again.",
-        buttons: [
-          {
-            text: "OK",
-            onPress: () => setAlert(initialAlertState),
-            style: "primary",
-          },
-        ],
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resendOtp = async () => {
-    const { error } = await supabase.auth.signInWithOtp({ email });
-
-    setAlert({
-      visible: true,
-      title: error ? "Error" : "OTP Sent",
-      message: error
-        ? error.message
-        : "A new OTP has been sent to your email.",
-      buttons: [
-        {
-          text: "OK",
-          onPress: () => setAlert(initialAlertState),
-          style: "primary",
-        },
-      ],
-    });
-    if (error) return;
-
-    // Reset the timer
-    setCountdown(60);
-    setIsTimerActive(true);
-  };
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <SafeAreaView style={styles.container}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <FontAwesome5 name="arrow-left" size={24} color="#343a40" />
-        </Pressable>
-
-        <Animated.View
-          style={[styles.card, { transform: [{ translateY: cardTranslateY }] }]}
-        >
-          <View style={styles.content}>
-            <Image
-              source={require("../../assets/otp-image.png")}
-              style={styles.image}
-            />
-            <Text style={styles.title}>OTP Verification</Text>
-            <Text style={styles.subtitle}>
-              Enter the OTP sent to{"\n"}
-              <Text style={styles.emailText}>{email}</Text>
-            </Text>
-
-            <View style={styles.otpContainer}>
-              {otp.map((digit, index) => (
-                <TextInput
-                  key={index}
-                  ref={(el) => (inputs.current[index] = el)}
-                  style={styles.otpBox}
-                  keyboardType="numeric"
-                  maxLength={1}
-                  onChangeText={(text) => handleChange(text, index)}
-                  onKeyPress={(e) => handleKeyPress(e, index)}
-                  value={digit}
-                />
-              ))}
-            </View>
-
-            {/* NEW: Resend OTP UI */}
-            <View style={styles.resendContainer}>
-              {isTimerActive ? (
-                <Text style={styles.resendText}>
-                  Resend code in {countdown}s
-                </Text>
-              ) : (
-                <Pressable onPress={resendOtp}>
-                  <Text style={[styles.resendText, styles.resendButton]}>
-                    Resend OTP
-                  </Text>
-                </Pressable>
-              )}
-            </View>
-
-            {/* Submit Button */}
-            <Pressable
-              style={styles.button}
-              onPress={verifyOtp}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Submit</Text>
-              )}
-            </Pressable>
-          </View>
-        </Animated.View>
-
-        <CustomAlert {...alert} />
-      </SafeAreaView>
-    </TouchableWithoutFeedback>
+    <Animated.View style={[styles.box, active && styles.boxActive, digit && styles.boxFilled, error && styles.boxError, style]}>
+      <AppText variant="h1">{digit ?? ""}</AppText>
+    </Animated.View>
   );
 }
 
-// --- NEW STYLES ---
+export default function VerifyOTPScreen() {
+  const router = useRouter();
+  const t = useTheme();
+  const styles = useStyles();
+  const { email } = useLocalSearchParams();
+  const inputRef = useRef(null);
 
-const styles = StyleSheet.create({
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [countdown, setCountdown] = useState(RESEND_SECONDS);
+
+  const shake = useSharedValue(0);
+  const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shake.value }] }));
+
+  useEffect(() => {
+    if (countdown === 0) return;
+    const id = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(id);
+  }, [countdown]);
+
+  const verify = async (token) => {
+    setLoading(true);
+    setError(null);
+    const { error: verifyError } = await supabase.auth.verifyOtp({ email, token, type: "email" });
+    setLoading(false);
+    if (verifyError) {
+      haptics.warning();
+      setError(verifyError.message);
+      setCode("");
+      shake.value = withSequence(
+        withTiming(-10, { duration: 50 }),
+        withTiming(10, { duration: 50 }),
+        withTiming(-8, { duration: 50 }),
+        withTiming(8, { duration: 50 }),
+        withTiming(0, { duration: 50 })
+      );
+      inputRef.current?.focus();
+      return;
+    }
+    haptics.success();
+    // AuthProvider picks up the new session and the guard in _layout.js
+    // routes to the right onboarding step or to home.
+  };
+
+  const onChangeCode = (text) => {
+    // One hidden input handles typing, pasting and SMS/email code autofill
+    const digits = text.replace(/\D/g, "").slice(0, CODE_LENGTH);
+    setCode(digits);
+    if (error) setError(null);
+    if (digits.length === CODE_LENGTH) verify(digits);
+  };
+
+  const resend = async () => {
+    const { error: resendError } = await supabase.auth.signInWithOtp({ email });
+    if (resendError) {
+      setError(resendError.message);
+      return;
+    }
+    setNotice("A new code is on its way.");
+    setCountdown(RESEND_SECONDS);
+  };
+
+  return (
+    <Screen keyboard>
+      <View style={styles.container}>
+        <IconButton icon="arrow-left" size={40} background="surfaceAlt" onPress={() => router.back()} accessibilityLabel="Back" />
+
+        <Animated.View entering={enter(0)} style={styles.header}>
+          <AppText variant="h1">Enter your code</AppText>
+          <AppText color="textSecondary" style={{ marginTop: 10 }}>
+            We sent a 6-digit code to{"\n"}
+            <AppText variant="bodyStrong">{email}</AppText>
+          </AppText>
+        </Animated.View>
+
+        <Animated.View entering={enter(1)}>
+          <Pressable onPress={() => inputRef.current?.focus()}>
+            <Animated.View style={[styles.boxes, shakeStyle]}>
+              {Array.from({ length: CODE_LENGTH }, (_, i) => (
+                <CodeBox key={i} digit={code[i]} active={i === code.length && !loading} error={!!error} />
+              ))}
+            </Animated.View>
+          </Pressable>
+          <TextInput
+            ref={inputRef}
+            value={code}
+            onChangeText={onChangeCode}
+            keyboardType="number-pad"
+            textContentType="oneTimeCode"
+            autoComplete="one-time-code"
+            maxLength={CODE_LENGTH}
+            autoFocus
+            caretHidden
+            selectionColor={t.colors.primary}
+            style={styles.hiddenInput}
+            accessibilityLabel="Verification code"
+          />
+
+          <AppText variant="caption" color={error ? "danger" : "success"} style={styles.message}>
+            {error ?? notice ?? " "}
+          </AppText>
+
+          <View style={styles.resendRow}>
+            {countdown > 0 ? (
+              <AppText variant="caption" color="textSecondary">
+                Resend code in {countdown}s
+              </AppText>
+            ) : (
+              <PressableScale onPress={resend} haptic="light">
+                <AppText variant="bodyStrong" color="primaryPressed">
+                  Resend code
+                </AppText>
+              </PressableScale>
+            )}
+          </View>
+        </Animated.View>
+
+        <View style={{ flex: 1 }} />
+
+        <Button
+          title="Verify"
+          onPress={() => verify(code)}
+          loading={loading}
+          disabled={code.length !== CODE_LENGTH}
+          haptic="medium"
+        />
+      </View>
+    </Screen>
+  );
+}
+
+const useStyles = makeStyles((t) => ({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
-    paddingHorizontal: 24,
-    paddingTop: 60,
+    padding: t.spacing.xxl,
+    paddingTop: t.spacing.md,
   },
-  backButton: {
-    position: "absolute",
-    top: 65,
-    left: 24,
-    zIndex: 1,
+  header: {
+    marginTop: t.spacing.xxl,
+    marginBottom: t.spacing.xxxl,
   },
-  card: {
-    flex: 1,
-    justifyContent: "center",
-  },
-  content: {
-    alignItems: "center",
-    paddingHorizontal: 8,
-  },
-  image: {
-    width: 180,
-    height: 180,
-    resizeMode: "contain",
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#212529",
-    marginBottom: 8,
-    marginLeft: 10,
-    // alignSelf: "flex-start",
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#6c757d",
-    textAlign: "center",
-    // alignSelf: "flex-start",
-    marginBottom: 32,
-    paddingHorizontal: 10,
-  },
-  emailText: {
-    fontWeight: "600",
-    color: "#343a40",
-  },
-  otpContainer: {
+  boxes: {
     flexDirection: "row",
     justifyContent: "space-between",
-    width: "100%",
-    marginBottom: 36,
-    paddingHorizontal: 10,
   },
-  otpBox: {
-    width: 45,
-    height: 45,
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-    borderRadius: 10,
+  box: {
+    width: 48,
+    height: 58,
+    borderRadius: t.radius.md,
+    borderWidth: 1.5,
+    borderColor: t.colors.border,
+    backgroundColor: t.colors.surface,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  boxActive: {
+    borderColor: t.colors.primary,
+    borderWidth: 2,
+  },
+  boxFilled: {
+    backgroundColor: t.colors.primarySoft,
+    borderColor: t.colors.primary,
+  },
+  boxError: {
+    borderColor: t.colors.danger,
+    backgroundColor: t.colors.dangerSoft,
+  },
+  hiddenInput: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    opacity: 0,
+  },
+  message: {
+    marginTop: t.spacing.md,
     textAlign: "center",
-    fontSize: 20,
-    fontWeight: "500",
-    color: "#212529",
   },
-  resendContainer: {
-    marginBottom: 36,
+  resendRow: {
     alignItems: "center",
+    marginTop: t.spacing.lg,
   },
-  resendText: {
-    fontSize: 14,
-    color: "#6c757d",
-  },
-  resendButton: {
-    fontWeight: "bold",
-    color: "#7B61FF", // Your primary theme color
-    textDecorationLine: "underline",
-  },
-  button: {
-    backgroundColor: "#7B61FF",
-    paddingVertical: 14,
-    borderRadius: 28,
-    alignItems: "center",
-    width: "100%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    // marginBottom: 24,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-});
+}));

@@ -1,23 +1,18 @@
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, RefreshControl, ScrollView, View } from "react-native";
+import Animated from "react-native-reanimated";
 import { useAuth } from "../../context/AuthProvider";
 import { useEntitlements } from "../../context/EntitlementsProvider";
 import { resizedImageUrl } from "../../lib/cloudinary";
 import { formatTimeLeft, matchStatus, STATUS_LABELS } from "../../lib/matching";
 import { openChat } from "../../lib/navigation";
 import { supabase } from "../../lib/supabase";
+import { makeStyles, useTheme } from "../../theme";
+import { AppText, EmptyState, enter, PressableScale, Screen, Skeleton } from "../../ui";
 
 // get_my_matches rows are profile cards plus match fields
 const toProfile = (m) => ({ ...m, user_id: m.other_user_id });
@@ -33,8 +28,81 @@ const formatTime = (iso) => {
   return date.toLocaleDateString([], { day: "numeric", month: "short" });
 };
 
+function NewMatch({ match, myId, index, onPress }) {
+  const t = useTheme();
+  const styles = useStyles();
+  const status = matchStatus(match, myId);
+  const myMove = status.kind === "your_move" || status.kind === "say_hi";
+
+  return (
+    <Animated.View entering={enter(index)}>
+      <PressableScale style={styles.newMatch} onPress={onPress} haptic="light" scaleTo={0.92}>
+        <LinearGradient
+          colors={myMove ? t.gradients.sunset : [t.colors.border, t.colors.border]}
+          style={styles.ring}
+        >
+          <Image source={{ uri: resizedImageUrl(match.photos?.[0], 200) }} style={styles.newMatchPhoto} />
+        </LinearGradient>
+        <AppText variant="bodyStrong" numberOfLines={1} style={{ marginTop: 6 }}>
+          {match.first_name}
+        </AppText>
+        <AppText variant="small" color={myMove ? "primaryPressed" : "textMuted"} numberOfLines={1}>
+          {STATUS_LABELS[status.kind]}
+        </AppText>
+        <AppText variant="small" color="textMuted">
+          {formatTimeLeft(match.expires_at)}
+        </AppText>
+      </PressableScale>
+    </Animated.View>
+  );
+}
+
+function Conversation({ item, myId, index, onPress }) {
+  const styles = useStyles();
+  const unread = item.unread_count > 0;
+  const fromMe = item.last_message_sender === myId;
+  const status = matchStatus(item, myId);
+
+  return (
+    <Animated.View entering={enter(index)}>
+      <PressableScale style={styles.row} onPress={onPress} haptic="light" scaleTo={0.98}>
+        <Image source={{ uri: resizedImageUrl(item.photos?.[0], 120) }} style={styles.avatar} />
+        <View style={styles.rowText}>
+          <View style={styles.rowTop}>
+            <AppText variant={unread ? "title" : "bodyStrong"}>{item.first_name}</AppText>
+            <AppText variant="small" color={unread ? "primaryPressed" : "textMuted"}>
+              {formatTime(item.last_message_at)}
+            </AppText>
+          </View>
+          <AppText variant={unread ? "bodyStrong" : "body"} color={unread ? "text" : "textSecondary"} numberOfLines={1}>
+            {fromMe ? "You: " : ""}
+            {item.last_message}
+          </AppText>
+          {item.expires_at && (
+            <View style={styles.expiry}>
+              <FontAwesome5 name="hourglass-half" size={10} color={styles.expiryText.color} />
+              <AppText variant="small" style={styles.expiryText}>
+                {status.kind === "your_turn" ? "Your turn to reply" : "Waiting for a reply"} · {formatTimeLeft(item.expires_at)}
+              </AppText>
+            </View>
+          )}
+        </View>
+        {unread && (
+          <View style={styles.badge}>
+            <AppText variant="small" color="onPrimary">
+              {item.unread_count}
+            </AppText>
+          </View>
+        )}
+      </PressableScale>
+    </Animated.View>
+  );
+}
+
 export default function ChatsScreen() {
   const router = useRouter();
+  const t = useTheme();
+  const styles = useStyles();
   const { user } = useAuth();
   const { match_limit, refresh: refreshEntitlements } = useEntitlements();
   const [matches, setMatches] = useState([]);
@@ -60,246 +128,161 @@ export default function ChatsScreen() {
   useEffect(() => {
     const channel = supabase
       .channel("chats-list")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages" },
-        () => loadMatches()
-      )
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => loadMatches())
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
   }, [loadMatches]);
 
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#7B61FF" />
-      </View>
-    );
-  }
-
   const newMatches = matches.filter((m) => !m.last_message_at);
   const conversations = matches.filter((m) => m.last_message_at);
 
-  return (
-    <SafeAreaView style={styles.container}>
+  const header = (
+    <View>
       <View style={styles.header}>
-        <Text style={styles.title}>Chats</Text>
+        <AppText variant="h1">Chats</AppText>
         {match_limit != null && (
-          <Pressable onPress={() => router.push({ pathname: "/premium", params: { reason: "matches" } })}>
-            <Text style={styles.limit}>
-              {matches.length}/{match_limit} active matches
-            </Text>
-          </Pressable>
+          <PressableScale
+            style={styles.limit}
+            onPress={() => router.push({ pathname: "/premium", params: { reason: "matches" } })}
+            haptic="light"
+          >
+            <AppText variant="caption">
+              {matches.length}/{match_limit} matches
+            </AppText>
+          </PressableScale>
         )}
       </View>
 
+      {newMatches.length > 0 && (
+        <View style={styles.section}>
+          <AppText variant="label" color="textSecondary" style={styles.sectionTitle}>
+            New matches · {newMatches.length}
+          </AppText>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12 }}>
+            {newMatches.map((m, i) => (
+              <NewMatch key={m.match_id} match={m} myId={user?.id} index={i} onPress={() => openChat(router, m.match_id, toProfile(m))} />
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {conversations.length > 0 && (
+        <AppText variant="label" color="textSecondary" style={[styles.sectionTitle, { marginTop: 8 }]}>
+          Messages
+        </AppText>
+      )}
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <Screen edges={["top"]}>
+        {header}
+        {[0, 1, 2, 3].map((i) => (
+          <View key={i} style={styles.row}>
+            <Skeleton width={60} height={60} radius={30} />
+            <View style={{ flex: 1, marginLeft: 14, gap: 8 }}>
+              <Skeleton width="40%" height={16} />
+              <Skeleton width="75%" height={14} />
+            </View>
+          </View>
+        ))}
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen edges={["top"]}>
       <FlatList
         data={conversations}
         keyExtractor={(item) => item.match_id}
-        refreshing={refreshing}
-        onRefresh={() => {
-          setRefreshing(true);
-          loadMatches();
-        }}
-        contentContainerStyle={{ flexGrow: 1 }}
-        ListHeaderComponent={
-          newMatches.length > 0 ? (
-            <View style={styles.newMatches}>
-              <Text style={styles.sectionTitle}>New matches</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {newMatches.map((m) => {
-                  const status = matchStatus(m, user?.id);
-                  const myMove = status.kind === "your_move" || status.kind === "say_hi";
-                  return (
-                    <Pressable
-                      key={m.match_id}
-                      style={styles.newMatch}
-                      onPress={() => openChat(router, m.match_id, toProfile(m))}
-                    >
-                      <Image
-                        source={{ uri: resizedImageUrl(m.photos?.[0], 200) }}
-                        style={[styles.newMatchPhoto, myMove && styles.myMoveRing]}
-                      />
-                      <Text style={styles.newMatchName} numberOfLines={1}>
-                        {m.first_name}
-                      </Text>
-                      <Text style={[styles.moveLabel, myMove && styles.myMoveLabel]} numberOfLines={1}>
-                        {STATUS_LABELS[status.kind]}
-                      </Text>
-                      <Text style={styles.timeLeft}>{formatTimeLeft(m.expires_at)}</Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-              {conversations.length > 0 && (
-                <Text style={[styles.sectionTitle, { marginTop: 16 }]}>
-                  Messages
-                </Text>
-              )}
-            </View>
-          ) : null
+        ListHeaderComponent={header}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={t.colors.primaryPressed}
+            colors={[t.colors.primaryPressed]}
+            onRefresh={() => {
+              setRefreshing(true);
+              loadMatches();
+            }}
+          />
         }
         ListEmptyComponent={
           newMatches.length === 0 ? (
-            <View style={styles.empty}>
-              <FontAwesome5 name="comments" size={48} color="#dee2e6" />
-              <Text style={styles.emptyText}>
-                No matches yet. When you and someone like each other,
-                you&apos;ll be able to chat here.
-              </Text>
-            </View>
+            <EmptyState emoji="💬" title="No matches yet" text="When you and someone like each other, you'll be able to chat here." />
           ) : (
-            <Text style={styles.hint}>
-              Say hi to your new matches above!
-            </Text>
+            <AppText color="textMuted" style={{ textAlign: "center", marginTop: 40 }}>
+              Say hi to your new matches above 👆
+            </AppText>
           )
         }
-        renderItem={({ item }) => {
-          const unread = item.unread_count > 0;
-          const fromMe = item.last_message_sender === user?.id;
-          return (
-            <Pressable
-              style={styles.row}
-              onPress={() => openChat(router, item.match_id, toProfile(item))}
-            >
-              <Image
-                source={{ uri: resizedImageUrl(item.photos?.[0], 120) }}
-                style={styles.avatar}
-              />
-              <View style={styles.rowText}>
-                <View style={styles.rowTop}>
-                  <Text style={[styles.name, unread && styles.bold]}>
-                    {item.first_name}
-                  </Text>
-                  <Text style={styles.time}>{formatTime(item.last_message_at)}</Text>
-                </View>
-                <Text
-                  style={[styles.preview, unread && styles.previewUnread]}
-                  numberOfLines={1}
-                >
-                  {fromMe ? "You: " : ""}
-                  {item.last_message}
-                </Text>
-                {item.expires_at && (
-                  <Text style={styles.expiry}>
-                    {matchStatus(item, user?.id).kind === "your_turn"
-                      ? "Your turn to reply"
-                      : "Waiting for a reply"}{" "}
-                    · {formatTimeLeft(item.expires_at)}
-                  </Text>
-                )}
-              </View>
-              {unread && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{item.unread_count}</Text>
-                </View>
-              )}
-            </Pressable>
-          );
-        }}
+        renderItem={({ item, index }) => (
+          <Conversation item={item} myId={user?.id} index={index} onPress={() => openChat(router, item.match_id, toProfile(item))} />
+        )}
       />
-    </SafeAreaView>
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+const useStyles = makeStyles((t) => ({
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 12,
+    paddingHorizontal: t.spacing.xl,
+    paddingTop: t.spacing.sm,
+    paddingBottom: t.spacing.lg,
   },
   limit: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#5f3dc4",
-    backgroundColor: "#f3f0ff",
-    paddingVertical: 5,
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radius.pill,
+    paddingVertical: 7,
     paddingHorizontal: 12,
-    borderRadius: 14,
-    overflow: "hidden",
+    ...t.shadow(2),
   },
-  myMoveRing: {
-    borderWidth: 3,
-    borderColor: "#7B61FF",
-  },
-  moveLabel: {
-    fontSize: 11,
-    color: "#868e96",
-    marginTop: 2,
-  },
-  myMoveLabel: {
-    color: "#7B61FF",
-    fontWeight: "700",
-  },
-  timeLeft: {
-    fontSize: 11,
-    color: "#adb5bd",
-  },
-  expiry: {
-    fontSize: 12,
-    color: "#e8590c",
-    marginTop: 2,
-    fontWeight: "600",
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#212529",
+  section: {
+    marginBottom: t.spacing.md,
   },
   sectionTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#7B61FF",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 10,
-    paddingHorizontal: 20,
-  },
-  newMatches: {
-    paddingBottom: 8,
+    paddingHorizontal: t.spacing.xl,
+    marginBottom: t.spacing.md,
   },
   newMatch: {
-    width: 80,
-    marginLeft: 16,
+    width: 88,
     alignItems: "center",
+    marginHorizontal: 4,
+  },
+  ring: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    padding: 3,
   },
   newMatchPhoto: {
-    width: 72,
-    height: 96,
-    borderRadius: 12,
-    backgroundColor: "#e9ecef",
-  },
-  newMatchName: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#212529",
-    marginTop: 6,
+    flex: 1,
+    borderRadius: 35,
+    borderWidth: 3,
+    borderColor: t.colors.bg,
+    backgroundColor: t.colors.surfaceAlt,
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    marginHorizontal: t.spacing.md,
+    marginBottom: t.spacing.sm,
+    padding: t.spacing.md,
+    borderRadius: t.radius.lg,
+    backgroundColor: t.colors.surface,
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#e9ecef",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: t.colors.surfaceAlt,
   },
   rowText: {
     flex: 1,
@@ -309,59 +292,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: 2,
   },
-  name: {
-    fontSize: 16,
-    color: "#212529",
-    fontWeight: "500",
+  expiry: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 4,
   },
-  bold: {
-    fontWeight: "700",
-  },
-  time: {
-    fontSize: 12,
-    color: "#adb5bd",
-  },
-  preview: {
-    fontSize: 14,
-    color: "#868e96",
-    marginTop: 2,
-  },
-  previewUnread: {
-    color: "#212529",
-    fontWeight: "600",
+  expiryText: {
+    color: t.colors.warning,
   },
   badge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: "#7B61FF",
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    paddingHorizontal: 7,
+    backgroundColor: t.colors.primary,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 6,
     marginLeft: 10,
   },
-  badgeText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  empty: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 40,
-  },
-  emptyText: {
-    fontSize: 15,
-    color: "#6c757d",
-    marginTop: 16,
-    textAlign: "center",
-  },
-  hint: {
-    fontSize: 14,
-    color: "#adb5bd",
-    textAlign: "center",
-    marginTop: 40,
-  },
-});
+}));

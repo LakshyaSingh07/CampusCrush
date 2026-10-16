@@ -1,95 +1,34 @@
 import { FontAwesome5 } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import {
-    ActivityIndicator,
-    ImageBackground,
-    Pressable,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    View,
-} from "react-native";
-import CustomAlert from "../../components/CustomAlert";
-import OnboardingProgress from "../../components/OnboardingProgress";
+import { Alert, View } from "react-native";
+import OnboardingStepLayout from "../../components/OnboardingStepLayout";
+import PhotoGrid from "../../components/PhotoGrid";
 import { useAuth } from "../../context/AuthProvider";
 import { uploadPhotos } from "../../lib/cloudinary";
 import { MAX_PHOTOS, MIN_PHOTOS_REQUIRED } from "../../lib/onboarding";
-
-const initialAlertState = {
-  visible: false,
-  title: "",
-  message: "",
-  buttons: [],
-};
+import { makeStyles, useTheme } from "../../theme";
+import { AppText } from "../../ui";
 
 export default function OnboardingStep5() {
   const router = useRouter();
+  const t = useTheme();
+  const styles = useStyles();
   const { profile, updateProfile } = useAuth();
 
-  // Each slot is { url } for an already-uploaded photo (when coming back to
-  // this step), { uri, mimeType } for a newly picked one, or null.
+  // Keep already-uploaded photos when coming back to this step
   const [photos, setPhotos] = useState(() =>
     Array.from({ length: MAX_PHOTOS }, (_, i) => {
       const url = profile?.profile_image_urls?.[i];
-      return url ? { url, uri: url } : null;
+      return url ? { url } : null;
     })
   );
   const [loading, setLoading] = useState(false);
-  const [alert, setAlert] = useState(initialAlertState);
 
-  const photoCount = photos.filter((p) => p !== null).length;
-  const canProceed = photoCount >= MIN_PHOTOS_REQUIRED;
-
-  const handleImagePick = async (index) => {
-    if (loading) return;
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      setAlert({
-        visible: true,
-        title: "Permission Denied",
-        message: "We need access to your photos to continue.",
-        buttons: [
-          {
-            text: "OK",
-            style: "primary",
-            onPress: () => setAlert(initialAlertState),
-          },
-        ],
-      });
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [3, 4],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      const { uri, mimeType } = result.assets[0];
-      setPhotos((prev) => {
-        const newPhotos = [...prev];
-        newPhotos[index] = { uri, mimeType };
-        return newPhotos;
-      });
-    }
-  };
-
-  const handleRemoveImage = (index) => {
-    if (loading) return;
-    setPhotos((prev) => {
-      const newPhotos = [...prev];
-      newPhotos[index] = null;
-      return newPhotos;
-    });
-  };
+  const photoCount = photos.filter(Boolean).length;
 
   const handleNext = async () => {
-    if (!canProceed || loading) return;
     setLoading(true);
-
     try {
       // Upload only newly picked photos, keeping the order of the slots
       const filled = photos.filter(Boolean);
@@ -99,154 +38,45 @@ export default function OnboardingStep5() {
 
       const { error } = await updateProfile({ profile_image_urls: urls });
       if (error) throw error;
-
       router.push("/onboarding/step6");
     } catch (error) {
-      setAlert({
-        visible: true,
-        title: "Upload Failed",
-        message: error.message || "Something went wrong. Please try again.",
-        buttons: [
-          {
-            text: "OK",
-            style: "primary",
-            onPress: () => setAlert(initialAlertState),
-          },
-        ],
-      });
+      Alert.alert("Upload failed", error.message || "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <OnboardingProgress step={5} />
+    <OnboardingStepLayout
+      step={5}
+      title="Time to put a face to the name"
+      subtitle={`Add at least ${MIN_PHOTOS_REQUIRED} photos: you with your pet, eating your fave food, or in a place you love.`}
+      canProceed={photoCount >= MIN_PHOTOS_REQUIRED}
+      loading={loading}
+      onNext={handleNext}
+    >
+      <PhotoGrid photos={photos} onChange={setPhotos} disabled={loading} />
 
-      <Text style={styles.title}>Time to put a face to the name</Text>
-      <Text style={styles.subtitle}>
-        You do you! Add at least {MIN_PHOTOS_REQUIRED} photos, whether it’s you
-        with your pet, eating your fave food, or in a place you love.
-      </Text>
-
-      {/* Photo Grid */}
-      <View style={styles.grid}>
-        {photos.map((photo, index) => (
-          <Pressable
-            key={index}
-            style={styles.slot}
-            onPress={() => handleImagePick(index)}
-          >
-            {photo ? (
-              <ImageBackground source={{ uri: photo.uri }} style={styles.photo}>
-                <Pressable
-                  style={styles.removeButton}
-                  onPress={() => handleRemoveImage(index)}
-                >
-                  <FontAwesome5 name="times" size={12} color="#fff" />
-                </Pressable>
-              </ImageBackground>
-            ) : (
-              <FontAwesome5 name="plus" size={24} color="#adb5bd" />
-            )}
-          </Pressable>
-        ))}
+      <View style={styles.tip}>
+        <FontAwesome5 name="lightbulb" size={16} color={t.colors.primaryPressed} solid />
+        <AppText variant="caption" color="textSecondary" style={{ flex: 1 }}>
+          {photoCount < MIN_PHOTOS_REQUIRED
+            ? `${MIN_PHOTOS_REQUIRED - photoCount} more to go. Clear, smiling photos of just you get the most likes.`
+            : "Looking good! Your first photo is the one people see first."}
+        </AppText>
       </View>
-
-      <View style={styles.infoBox}>
-        <FontAwesome5 name="lightbulb" size={16} color="#495057" />
-        <Text style={styles.infoText}>
-          Photos bring your profile to life, giving others a better sense of who
-          you are.
-        </Text>
-      </View>
-
-      <Pressable
-        style={[
-          styles.fab,
-          !canProceed && { opacity: 0.5, backgroundColor: "#adb5bd" },
-        ]}
-        onPress={handleNext}
-        disabled={!canProceed || loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <FontAwesome5 name="arrow-right" size={20} color="#fff" />
-        )}
-      </Pressable>
-
-      <CustomAlert {...alert} />
-    </SafeAreaView>
+    </OnboardingStepLayout>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", padding: 24, paddingTop: 70 },
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#212529",
-    marginBottom: 8,
-  },
-  subtitle: { fontSize: 16, color: "#6c757d", marginBottom: 32 },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-  },
-  slot: {
-    width: "30%",
-    aspectRatio: 3 / 4, // Portrait aspect ratio
-    backgroundColor: "#f1f3f5",
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: "5%",
-  },
-  photo: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 12,
-    overflow: "hidden",
-    justifyContent: "flex-end",
-    alignItems: "flex-end",
-  },
-  removeButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    margin: 4,
-  },
-  infoBox: {
+const useStyles = makeStyles((t) => ({
+  tip: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#e9ecef",
-    borderRadius: 12,
-    padding: 16,
-    marginTop: "auto", // Pushes the box towards the bottom, above the FAB
-    marginBottom: 130,
+    gap: t.spacing.md,
+    backgroundColor: t.colors.surfaceAlt,
+    borderRadius: t.radius.md,
+    padding: t.spacing.lg,
+    marginTop: t.spacing.xxl,
   },
-  infoText: {
-    flex: 1,
-    marginLeft: 12,
-    color: "#495057",
-    fontSize: 14,
-  },
-  fab: {
-    position: "absolute",
-    bottom: 40,
-    right: 24,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#212529",
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 5,
-  },
-});
+}));

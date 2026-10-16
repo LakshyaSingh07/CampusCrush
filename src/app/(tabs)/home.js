@@ -1,15 +1,14 @@
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Alert, StyleSheet, useWindowDimensions, View } from "react-native";
+import Animated, {
+  Extrapolation,
+  FadeIn,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 import MatchModal from "../../components/MatchModal";
 import ProfileCard from "../../components/ProfileCard";
 import ProfileDetails from "../../components/ProfileDetails";
@@ -20,11 +19,29 @@ import { useEntitlements } from "../../context/EntitlementsProvider";
 import { openChat } from "../../lib/navigation";
 import { LIMIT_ERRORS } from "../../lib/premium";
 import { supabase } from "../../lib/supabase";
+import { makeStyles, useTheme } from "../../theme";
+import { AppText, EmptyState, enter, IconButton, PressableScale, Screen, Skeleton } from "../../ui";
 
 const PAGE_SIZE = 20;
 
+function DeckSkeleton() {
+  const styles = useStyles();
+  return (
+    <Animated.View entering={FadeIn} style={[styles.card, styles.skeletonCard]}>
+      <View style={styles.skeletonInfo}>
+        <Skeleton width={110} height={22} radius={11} />
+        <Skeleton width="60%" height={30} style={{ marginTop: 12 }} />
+        <Skeleton width="45%" height={16} style={{ marginTop: 10 }} />
+      </View>
+    </Animated.View>
+  );
+}
+
 export default function HomeScreen() {
   const router = useRouter();
+  const t = useTheme();
+  const styles = useStyles();
+  const { width } = useWindowDimensions();
   const { profile: myProfile } = useAuth();
   const { is_premium, swipesLeft, refresh: refreshEntitlements } = useEntitlements();
   const [cards, setCards] = useState([]);
@@ -35,24 +52,21 @@ export default function HomeScreen() {
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [undoing, setUndoing] = useState(false);
 
-  const openPaywall = (reason) => router.push({ pathname: "/premium", params: { reason } });
-
   const topCardRef = useRef(null);
   // Profiles already swiped this session. A refetch can race with an
   // in-flight swipe, so filter them out of new pages.
   const swipedIds = useRef(new Set());
+  // Horizontal drag of the top card, so the next card can scale up with it
+  const dragX = useSharedValue(0);
+
+  const openPaywall = (reason) => router.push({ pathname: "/premium", params: { reason } });
 
   const loadFeed = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
-    const { data, error } = await supabase.rpc("get_discovery_feed", {
-      p_limit: PAGE_SIZE,
-    });
-    if (error) {
-      setLoadError(error.message);
-    } else {
-      setCards(data.filter((p) => !swipedIds.current.has(p.user_id)));
-    }
+    const { data, error } = await supabase.rpc("get_discovery_feed", { p_limit: PAGE_SIZE });
+    if (error) setLoadError(error.message);
+    else setCards(data.filter((p) => !swipedIds.current.has(p.user_id)));
     setLoading(false);
   }, []);
 
@@ -62,9 +76,7 @@ export default function HomeScreen() {
 
   // Fetch the next page when the deck runs out
   useEffect(() => {
-    if (!loading && !loadError && cards.length === 0 && swipedIds.current.size > 0) {
-      loadFeed();
-    }
+    if (!loading && !loadError && cards.length === 0 && swipedIds.current.size > 0) loadFeed();
     // Only react to the deck emptying
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cards.length]);
@@ -76,17 +88,12 @@ export default function HomeScreen() {
 
   const putCardBack = (profile) => {
     swipedIds.current.delete(profile.user_id);
-    setCards((prev) =>
-      prev.some((c) => c.user_id === profile.user_id) ? prev : [profile, ...prev]
-    );
+    setCards((prev) => (prev.some((c) => c.user_id === profile.user_id) ? prev : [profile, ...prev]));
   };
 
   const handleSwipe = async (profile, direction) => {
     removeTopCard(profile.user_id);
-    const { data, error } = await supabase.rpc("swipe", {
-      p_target: profile.user_id,
-      p_direction: direction,
-    });
+    const { data, error } = await supabase.rpc("swipe", { p_target: profile.user_id, p_direction: direction });
     if (error) {
       // Free-tier limit: bring the card back and show the Premium screen
       const limit = LIMIT_ERRORS[error.message];
@@ -100,9 +107,7 @@ export default function HomeScreen() {
       return;
     }
     refreshEntitlements();
-    if (data?.[0]?.matched) {
-      setMatch({ profile, matchId: data[0].match_id });
-    }
+    if (data?.[0]?.matched) setMatch({ profile, matchId: data[0].match_id });
   };
 
   // Buttons check the daily limit before animating; drags are checked by the server
@@ -129,56 +134,55 @@ export default function HomeScreen() {
     refreshEntitlements();
   };
 
+  const nextCardStyle = useAnimatedStyle(() => {
+    const progress = interpolate(Math.abs(dragX.value), [0, width * 0.5], [0, 1], Extrapolation.CLAMP);
+    return {
+      transform: [{ scale: 0.92 + progress * 0.08 }, { translateY: 14 - progress * 14 }],
+      opacity: 0.7 + progress * 0.3,
+    };
+  });
+
   const [top, next] = cards;
 
   const renderDeck = () => {
-    if (loading && cards.length === 0) {
-      return <ActivityIndicator size="large" color="#7B61FF" />;
-    }
+    if (loading && cards.length === 0) return <DeckSkeleton />;
     if (loadError) {
       return (
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>Couldn&apos;t load profiles</Text>
-          <Text style={styles.emptyText}>{loadError}</Text>
-          <Pressable style={styles.refreshButton} onPress={loadFeed}>
-            <Text style={styles.refreshText}>Try again</Text>
-          </Pressable>
-        </View>
+        <EmptyState icon="wifi" title="Couldn't load profiles" text={loadError} actionTitle="Try again" onAction={loadFeed} />
       );
     }
     if (!top) {
       return (
-        <View style={styles.empty}>
-          <FontAwesome5 name="mug-hot" size={48} color="#adb5bd" />
-          <Text style={styles.emptyTitle}>You&apos;re all caught up</Text>
-          <Text style={styles.emptyText}>
-            Check back later to see new people from campus.
-          </Text>
-          <Pressable style={styles.refreshButton} onPress={loadFeed}>
-            <Text style={styles.refreshText}>Refresh</Text>
-          </Pressable>
+        <EmptyState
+          emoji="☕"
+          title="You're all caught up"
+          text="Check back later to see new people from campus."
+          actionTitle="Refresh"
+          onAction={loadFeed}
+        >
           {swipedIds.current.size > 0 && (
-            <Pressable style={styles.undoLink} onPress={undo} disabled={undoing}>
-              <FontAwesome5 name="undo" size={13} color="#f08c00" />
-              <Text style={styles.undoLinkText}>Undo last swipe</Text>
-            </Pressable>
+            <PressableScale style={styles.undoLink} onPress={undo} disabled={undoing} haptic="light">
+              <FontAwesome5 name="undo" size={13} color={t.colors.warning} />
+              <AppText variant="bodyStrong" color="warning">
+                Undo last swipe
+              </AppText>
+            </PressableScale>
           )}
-        </View>
+        </EmptyState>
       );
     }
     return (
       <>
         {next && (
-          <ProfileCard
-            key={next.user_id}
-            profile={next}
-            style={[styles.card, styles.nextCard]}
-          />
+          <Animated.View key={next.user_id} style={[styles.card, nextCardStyle]}>
+            <ProfileCard profile={next} style={{ flex: 1 }} />
+          </Animated.View>
         )}
         <SwipeableCard
           key={top.user_id}
           ref={topCardRef}
           profile={top}
+          dragX={dragX}
           style={styles.card}
           onSwipe={(direction) => handleSwipe(top, direction)}
           onMorePress={() => setMenuVisible(true)}
@@ -188,95 +192,96 @@ export default function HomeScreen() {
     );
   };
 
+  const actionButtons = (onAction) => (
+    <View style={styles.actions}>
+      <IconButton
+        icon="times"
+        size={64}
+        iconSize={26}
+        color="pass"
+        background="surface"
+        elevated
+        onPress={() => onAction("pass")}
+        accessibilityLabel="Pass"
+      />
+      <IconButton
+        icon="heart"
+        size={72}
+        iconSize={30}
+        color="onPrimary"
+        background="primary"
+        elevated
+        haptic="medium"
+        onPress={() => onAction("like")}
+        accessibilityLabel="Like"
+      />
+    </View>
+  );
+
   return (
-    <SafeAreaView style={styles.container}>
+    <Screen edges={["top"]}>
       <View style={styles.header}>
-        <Text style={styles.logo}>CampusCrush</Text>
+        <AppText variant="h1" style={styles.logo}>
+          campus<AppText variant="h1" color="primaryPressed">crush</AppText>
+        </AppText>
         {is_premium ? (
           <View style={[styles.pill, styles.premiumPill]}>
-            <FontAwesome5 name="crown" size={11} color="#f08c00" />
-            <Text style={[styles.pillText, { color: "#e67700" }]}>Premium</Text>
+            <FontAwesome5 name="crown" size={11} color={t.colors.onPrimary} />
+            <AppText variant="caption" color="onPrimary">
+              Premium
+            </AppText>
           </View>
         ) : (
           swipesLeft !== null && (
-            <Pressable style={styles.pill} onPress={() => openPaywall("swipes")}>
-              <Text style={styles.pillText}>
-                {swipesLeft} {swipesLeft === 1 ? "swipe" : "swipes"} left today
-              </Text>
-            </Pressable>
+            <PressableScale style={styles.pill} onPress={() => openPaywall("swipes")} haptic="light">
+              <FontAwesome5 name="bolt" size={11} color={t.colors.primaryPressed} solid />
+              <AppText variant="caption">
+                {swipesLeft} {swipesLeft === 1 ? "swipe" : "swipes"} left
+              </AppText>
+            </PressableScale>
           )
         )}
       </View>
 
       {myProfile?.is_paused && (
-        <Pressable style={styles.pausedBanner} onPress={() => router.push("/(tabs)/profile")}>
-          <Text style={styles.pausedText}>
-            Your profile is paused, so nobody new can see you. Tap to change.
-          </Text>
-        </Pressable>
+        <Animated.View entering={enter(0)}>
+          <PressableScale style={styles.pausedBanner} onPress={() => router.push("/(tabs)/profile")} scaleTo={0.98}>
+            <FontAwesome5 name="pause-circle" size={16} color={t.colors.warning} solid />
+            <AppText variant="caption" color="warning" style={{ flex: 1 }}>
+              Your profile is paused, so nobody new can see you. Tap to change.
+            </AppText>
+          </PressableScale>
+        </Animated.View>
       )}
 
       <View style={styles.deck}>{renderDeck()}</View>
 
       {top && (
-        <View style={styles.actions}>
-          <Pressable
-            style={[styles.actionButton, styles.smallButton]}
+        <Animated.View entering={enter(2)} style={styles.actionsRow}>
+          <IconButton
+            icon="undo"
+            size={48}
+            iconSize={17}
+            color="warning"
+            background="surface"
+            elevated
+            loading={undoing}
             onPress={undo}
-            disabled={undoing}
             accessibilityLabel="Undo last swipe"
-          >
-            {undoing ? (
-              <ActivityIndicator color="#f08c00" />
-            ) : (
-              <FontAwesome5 name="undo" size={18} color="#f08c00" />
-            )}
-          </Pressable>
-          <Pressable
-            style={[styles.actionButton, styles.passButton]}
-            onPress={() => swipeWithButton("pass")}
-            accessibilityLabel="Pass"
-          >
-            <FontAwesome5 name="times" size={28} color="#e03131" />
-          </Pressable>
-          <Pressable
-            style={[styles.actionButton, styles.likeButton]}
-            onPress={() => swipeWithButton("like")}
-            accessibilityLabel="Like"
-          >
-            <FontAwesome5 name="heart" solid size={28} color="#fff" />
-          </Pressable>
-        </View>
+          />
+          {actionButtons(swipeWithButton)}
+          <View style={{ width: 48 }} />
+        </Animated.View>
       )}
 
       <ProfileDetails
         profile={top}
         visible={detailsVisible && !!top}
         onClose={() => setDetailsVisible(false)}
-        footer={
-          <View style={styles.actions}>
-            <Pressable
-              style={[styles.actionButton, styles.passButton]}
-              onPress={() => {
-                setDetailsVisible(false);
-                swipeWithButton("pass");
-              }}
-              accessibilityLabel="Pass"
-            >
-              <FontAwesome5 name="times" size={28} color="#e03131" />
-            </Pressable>
-            <Pressable
-              style={[styles.actionButton, styles.likeButton]}
-              onPress={() => {
-                setDetailsVisible(false);
-                swipeWithButton("like");
-              }}
-              accessibilityLabel="Like"
-            >
-              <FontAwesome5 name="heart" solid size={28} color="#fff" />
-            </Pressable>
-          </View>
-        }
+        footer={actionButtons((direction) => {
+          setDetailsVisible(false);
+          swipeWithButton(direction);
+        })}
       />
 
       {top && (
@@ -300,138 +305,79 @@ export default function HomeScreen() {
           openChat(router, matchId, profile);
         }}
       />
-    </SafeAreaView>
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
+const useStyles = makeStyles((t) => ({
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 8,
+    paddingHorizontal: t.spacing.xl,
+    paddingTop: t.spacing.sm,
+    paddingBottom: t.spacing.md,
+  },
+  logo: {
+    letterSpacing: -0.8,
   },
   pill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#f3f0ff",
-    borderRadius: 14,
-    paddingVertical: 5,
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radius.pill,
+    paddingVertical: 7,
     paddingHorizontal: 12,
+    ...t.shadow(2),
   },
   premiumPill: {
-    backgroundColor: "#fff4e6",
-  },
-  pillText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#5f3dc4",
-  },
-  smallButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#fff",
-  },
-  logo: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#7B61FF",
+    backgroundColor: t.colors.primary,
   },
   pausedBanner: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: "#fff3bf",
-  },
-  pausedText: {
-    color: "#5c3c00",
-    fontSize: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: t.spacing.md,
+    marginHorizontal: t.spacing.lg,
+    marginBottom: t.spacing.sm,
+    padding: t.spacing.md,
+    borderRadius: t.radius.md,
+    backgroundColor: t.colors.warningSoft,
   },
   deck: {
     flex: 1,
-    marginHorizontal: 12,
-    justifyContent: "center",
-    alignItems: "center",
+    marginHorizontal: t.spacing.md,
   },
   card: {
     ...StyleSheet.absoluteFillObject,
   },
-  nextCard: {
-    transform: [{ scale: 0.95 }],
+  skeletonCard: {
+    borderRadius: 28,
+    backgroundColor: t.colors.skeleton,
+    justifyContent: "flex-end",
   },
-  empty: {
+  skeletonInfo: {
+    padding: 24,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 32,
-  },
-  emptyTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#212529",
-    marginTop: 16,
-    textAlign: "center",
-  },
-  emptyText: {
-    fontSize: 15,
-    color: "#6c757d",
-    marginTop: 8,
-    textAlign: "center",
-  },
-  refreshButton: {
-    marginTop: 24,
-    paddingVertical: 12,
-    paddingHorizontal: 28,
-    borderRadius: 24,
-    backgroundColor: "#7B61FF",
-  },
-  refreshText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 15,
+    paddingHorizontal: t.spacing.xxl,
+    paddingVertical: t.spacing.lg,
   },
   actions: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 28,
-    paddingVertical: 16,
+    gap: t.spacing.xxl,
+    paddingVertical: t.spacing.sm,
   },
   undoLink: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginTop: 16,
-    padding: 8,
+    gap: t.spacing.sm,
+    marginTop: t.spacing.lg,
+    padding: t.spacing.sm,
   },
-  undoLinkText: {
-    color: "#f08c00",
-    fontWeight: "600",
-    fontSize: 15,
-  },
-  actionButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  passButton: {
-    backgroundColor: "#fff",
-  },
-  likeButton: {
-    backgroundColor: "#7B61FF",
-  },
-});
+}));

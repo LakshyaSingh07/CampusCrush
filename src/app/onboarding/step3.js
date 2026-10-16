@@ -1,235 +1,87 @@
-import { FontAwesome5 } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import CustomAlert from "../../components/CustomAlert";
-import OnboardingProgress from "../../components/OnboardingProgress";
+import { Alert, View } from "react-native";
+import Animated from "react-native-reanimated";
+import ChoiceCard from "../../components/ChoiceCard";
+import OnboardingStepLayout from "../../components/OnboardingStepLayout";
 import { useAuth } from "../../context/AuthProvider";
-import {
-  GENDER_OPTIONS,
-  INTEREST_OPTIONS,
-  interestLabelFor,
-} from "../../lib/onboarding";
+import { GENDER_OPTIONS, INTEREST_OPTIONS, interestLabelFor } from "../../lib/onboarding";
+import { makeStyles } from "../../theme";
+import { AppText, enter } from "../../ui";
 
-const initialAlertState = {
-  visible: false,
-  title: "",
-  message: "",
-  buttons: [],
-};
-
-const RadioChoice = ({ label, isActive, onPress }) => (
-  <Pressable
-    onPress={onPress}
-    style={[styles.choice, isActive && styles.choiceActive]}
-  >
-    <Text style={[styles.choiceText, isActive && styles.choiceTextActive]}>
-      {label}
-    </Text>
-    <View style={[styles.radioOuter, isActive && styles.radioOuterActive]}>
-      {isActive ? <View style={styles.radioInner} /> : null}
-    </View>
-  </Pressable>
-);
+const GENDER_EMOJI = { Woman: "👩", Man: "👨", Nonbinary: "🧑" };
+const INTEREST_EMOJI = { Women: "👩", Men: "👨", Everyone: "🌈" };
 
 export default function OnboardingStep3() {
   const router = useRouter();
+  const styles = useStyles();
   const { profile, updateProfile } = useAuth();
 
-  const firstName = useMemo(() => {
-    if (!profile?.full_name) return "";
-    const parts = String(profile.full_name).trim().split(/\s+/);
-    return parts[0];
-  }, [profile?.full_name]);
+  const firstName = useMemo(
+    () => String(profile?.full_name ?? "").trim().split(/\s+/)[0],
+    [profile?.full_name]
+  );
 
   const [gender, setGender] = useState(profile?.gender ?? "");
-  const [interest, setInterest] = useState(
-    interestLabelFor(profile?.interested_in)
-  );
+  const [interest, setInterest] = useState(interestLabelFor(profile?.interested_in));
   const [loading, setLoading] = useState(false);
-  const [alert, setAlert] = useState(initialAlertState);
-
-  const canProceed = Boolean(gender && interest);
 
   const handleNext = async () => {
-    if (!canProceed || loading) return;
     setLoading(true);
-
-    const interestedIn = INTEREST_OPTIONS.find(
-      (opt) => opt.label === interest
-    ).value;
     const { error } = await updateProfile({
       gender,
-      interested_in: interestedIn,
+      interested_in: INTEREST_OPTIONS.find((opt) => opt.label === interest).value,
     });
-
     setLoading(false);
-    if (error) {
-      setAlert({
-        visible: true,
-        title: "Error",
-        message: error.message || "Failed to save your selection.",
-        buttons: [
-          {
-            text: "OK",
-            style: "primary",
-            onPress: () => setAlert(initialAlertState),
-          },
-        ],
-      });
-      return;
-    }
-
+    if (error) return Alert.alert("Error", error.message || "Failed to save your selection.");
     router.push("/onboarding/step4");
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <OnboardingProgress step={3} />
+    <OnboardingStepLayout
+      step={3}
+      title={`${firstName || "Your name"} is a great name`}
+      subtitle="We love that you’re here. Tell us a bit about who you are and who you’d like to meet."
+      canProceed={Boolean(gender && interest)}
+      loading={loading}
+      onNext={handleNext}
+    >
+      <AppText variant="title" style={styles.question}>
+        Which gender best describes you?
+      </AppText>
+      <View style={styles.group}>
+        {GENDER_OPTIONS.map((opt, i) => (
+          <Animated.View key={opt} entering={enter(i + 1)}>
+            <ChoiceCard label={opt} emoji={GENDER_EMOJI[opt]} selected={gender === opt} onPress={() => setGender(opt)} />
+          </Animated.View>
+        ))}
+      </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.headline}>
-          {firstName || "Your name"} is a great name
-        </Text>
-        <Text style={styles.subtitle}>
-          We love that you’re here. Tell us a bit about who you are and who
-          you’d like to meet.
-        </Text>
-
-        <Text style={styles.question}>Which gender best describes you?</Text>
-        <View style={styles.choiceGroup}>
-          {GENDER_OPTIONS.map((opt) => (
-            <RadioChoice
-              key={opt}
-              label={opt}
-              isActive={gender === opt}
-              onPress={() => setGender(opt)}
-            />
-          ))}
-        </View>
-
-        <Text style={styles.question}>Show me</Text>
-        <View style={styles.choiceGroup}>
-          {INTEREST_OPTIONS.map((opt) => (
-            <RadioChoice
-              key={opt.label}
+      <AppText variant="title" style={styles.question}>
+        Show me
+      </AppText>
+      <View style={styles.group}>
+        {INTEREST_OPTIONS.map((opt, i) => (
+          <Animated.View key={opt.label} entering={enter(i + 4)}>
+            <ChoiceCard
               label={opt.label}
-              isActive={interest === opt.label}
+              emoji={INTEREST_EMOJI[opt.label]}
+              selected={interest === opt.label}
               onPress={() => setInterest(opt.label)}
             />
-          ))}
-        </View>
-      </ScrollView>
-
-      <Pressable
-        accessibilityRole="button"
-        style={[styles.fab, !canProceed && { opacity: 0.4 }]}
-        onPress={handleNext}
-        disabled={!canProceed || loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <FontAwesome5 name="arrow-right" size={20} color="#fff" />
-        )}
-      </Pressable>
-      <CustomAlert {...alert} />
-    </SafeAreaView>
+          </Animated.View>
+        ))}
+      </View>
+    </OnboardingStepLayout>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-    padding: 24,
-    paddingTop: 70,
-  },
-  scrollContent: {
-    paddingBottom: 120, // Keep the last option clear of the FAB
-  },
-  headline: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#212529",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#6c757d",
-    marginBottom: 24,
-  },
+const useStyles = makeStyles((t) => ({
   question: {
-    fontSize: 16,
-    color: "#212529",
-    marginBottom: 12,
-    fontWeight: "600",
+    marginBottom: t.spacing.md,
   },
-  choiceGroup: {
-    gap: 12,
-    marginBottom: 28,
+  group: {
+    gap: t.spacing.md,
+    marginBottom: t.spacing.xxl,
   },
-  choice: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    backgroundColor: "#fff",
-  },
-  choiceActive: {
-    borderColor: "#212529",
-  },
-  choiceText: {
-    fontSize: 16,
-    color: "#212529",
-  },
-  choiceTextActive: {
-    fontWeight: "600",
-  },
-  radioOuter: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: "#adb5bd",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  radioOuterActive: {
-    borderColor: "#212529",
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#212529",
-  },
-  fab: {
-    position: "absolute",
-    bottom: 40,
-    right: 24,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#212529",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-});
+}));

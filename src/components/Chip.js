@@ -1,47 +1,43 @@
-import { Pressable, StyleSheet, Text } from "react-native";
+import { makeStyles } from "../theme";
+import { AppText, PressableScale } from "../ui";
 
 // Selectable pill. Without onPress it renders as a static tag.
 export default function Chip({ label, selected, onPress, disabled, style }) {
+  const styles = useStyles();
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
       disabled={disabled || !onPress}
-      style={[
-        styles.chip,
-        selected && styles.selected,
-        disabled && !selected && styles.disabled,
-        style,
-      ]}
+      haptic={onPress ? "select" : undefined}
+      scaleTo={0.94}
+      style={[styles.chip, selected && styles.selected, disabled && !selected && styles.disabled, style]}
       accessibilityRole={onPress ? "button" : undefined}
       accessibilityState={onPress ? { selected: !!selected } : undefined}
     >
-      <Text style={[styles.text, selected && styles.selectedText]}>{label}</Text>
-    </Pressable>
+      <AppText variant={selected ? "bodyStrong" : "bodyMedium"} color={selected ? "onPrimary" : "text"} style={styles.text}>
+        {label}
+      </AppText>
+    </PressableScale>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((t) => ({
   chip: {
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: t.colors.border,
+    borderRadius: t.radius.pill,
     paddingVertical: 8,
     paddingHorizontal: 14,
-    backgroundColor: "#fff",
+    backgroundColor: t.colors.surface,
   },
   selected: {
-    borderColor: "#7B61FF",
-    backgroundColor: "#f3f0ff",
+    borderColor: t.colors.primary,
+    backgroundColor: t.colors.primary,
   },
   disabled: {
     opacity: 0.4,
   },
   text: {
     fontSize: 15,
-    color: "#212529",
   },
-  selectedText: {
-    color: "#5f3dc4",
-    fontWeight: "600",
-  },
-});
+}));

@@ -1,11 +1,15 @@
 import { FontAwesome5 } from "@expo/vector-icons";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { View } from "react-native";
 import { LIFESTYLE_FIELDS } from "../lib/profileOptions";
+import { makeStyles, useTheme } from "../theme";
+import { AppText, TextField } from "../ui";
 import Chip from "./Chip";
 
 // Optional lifestyle answers. `values` is keyed by profile column name
 // (drinker_status, smoker_status, exercise_status, religion, hometown).
 export default function LifestyleFields({ values, onChange }) {
+  const t = useTheme();
+  const styles = useStyles();
   const set = (key, value) => onChange({ ...values, [key]: value });
 
   return (
@@ -13,8 +17,12 @@ export default function LifestyleFields({ values, onChange }) {
       {LIFESTYLE_FIELDS.map((field) => (
         <View key={field.key} style={styles.field}>
           <View style={styles.labelRow}>
-            <FontAwesome5 name={field.icon} size={14} color="#495057" />
-            <Text style={styles.label}>{field.label}</Text>
+            <View style={styles.icon}>
+              <FontAwesome5 name={field.icon} size={13} color={t.colors.primaryPressed} />
+            </View>
+            <AppText variant="title" style={{ fontSize: 16 }}>
+              {field.label}
+            </AppText>
           </View>
           <View style={styles.wrap}>
             {field.options.map((option) => (
@@ -23,58 +31,45 @@ export default function LifestyleFields({ values, onChange }) {
                 label={option}
                 selected={values[field.key] === option}
                 // Tapping the selected option again clears it
-                onPress={() =>
-                  set(field.key, values[field.key] === option ? null : option)
-                }
+                onPress={() => set(field.key, values[field.key] === option ? null : option)}
               />
             ))}
           </View>
         </View>
       ))}
 
-      <View style={styles.field}>
-        <View style={styles.labelRow}>
-          <FontAwesome5 name="home" size={14} color="#495057" />
-          <Text style={styles.label}>Hometown</Text>
-        </View>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g. Lucknow"
-          placeholderTextColor="#adb5bd"
-          value={values.hometown ?? ""}
-          onChangeText={(text) => set("hometown", text)}
-          maxLength={50}
-        />
-      </View>
+      <TextField
+        label="Hometown"
+        placeholder="e.g. Lucknow"
+        value={values.hometown ?? ""}
+        onChangeText={(text) => set("hometown", text)}
+        maxLength={50}
+      />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((t) => ({
   field: {
-    marginBottom: 22,
+    marginBottom: t.spacing.xxl,
   },
   labelRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 10,
+    gap: t.spacing.sm,
+    marginBottom: t.spacing.md,
   },
-  label: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#212529",
+  icon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: t.colors.primarySoft,
+    justifyContent: "center",
+    alignItems: "center",
   },
   wrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: t.spacing.sm,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-  },
-});
+}));

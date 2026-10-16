@@ -1,17 +1,14 @@
 import { FontAwesome5 } from "@expo/vector-icons";
-import {
-  ActivityIndicator,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { useRouter } from "expo-router";
+import { ActivityIndicator, ScrollView, View } from "react-native";
+import Animated from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { makeStyles, useTheme } from "../theme";
+import { AppText, enter, IconButton, PressableScale, Screen } from "../ui";
 import OnboardingProgress from "./OnboardingProgress";
 
-// Shared layout for onboarding steps: progress bar, title, scrollable
-// content, an optional Skip link and the round "next" button.
+// Shared layout for onboarding steps: back button, animated progress, title,
+// scrollable content, an optional Skip link and the round "next" button.
 export default function OnboardingStepLayout({
   step,
   title,
@@ -20,91 +17,113 @@ export default function OnboardingStepLayout({
   loading,
   onNext,
   onSkip,
+  showBack = true,
+  scroll = true,
   children,
 }) {
+  const t = useTheme();
+  const styles = useStyles();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+
+  const body = (
+    <>
+      <Animated.View entering={enter(0)}>
+        <AppText variant="h1">{title}</AppText>
+        {subtitle ? (
+          <AppText color="textSecondary" style={styles.subtitle}>
+            {subtitle}
+          </AppText>
+        ) : null}
+      </Animated.View>
+      <Animated.View entering={enter(1)}>{children}</Animated.View>
+    </>
+  );
+
   return (
-    <SafeAreaView style={styles.container}>
+    <Screen keyboard>
       <View style={styles.top}>
+        <View style={styles.topRow}>
+          {showBack && router.canGoBack() ? (
+            <IconButton icon="arrow-left" size={40} background="surfaceAlt" onPress={() => router.back()} accessibilityLabel="Back" />
+          ) : (
+            <View style={{ height: 40 }} />
+          )}
+          {onSkip && (
+            <PressableScale onPress={onSkip} disabled={loading} hitSlop={10}>
+              <AppText variant="bodyStrong" color="textSecondary">
+                Skip
+              </AppText>
+            </PressableScale>
+          )}
+        </View>
         <OnboardingProgress step={step} />
-        {onSkip && (
-          <Pressable onPress={onSkip} disabled={loading} hitSlop={10} style={styles.skip}>
-            <Text style={styles.skipText}>Skip</Text>
-          </Pressable>
-        )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>{title}</Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-        {children}
-      </ScrollView>
+      {scroll ? (
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {body}
+        </ScrollView>
+      ) : (
+        <View style={[styles.content, { flex: 1 }]}>{body}</View>
+      )}
 
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel="Next"
-        style={[styles.fab, !canProceed && { opacity: 0.4 }]}
+        haptic="medium"
+        scaleTo={0.9}
+        style={[styles.fab, { bottom: insets.bottom + 24 }, !canProceed && styles.fabDisabled]}
         onPress={onNext}
         disabled={!canProceed || loading}
       >
         {loading ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={t.colors.onPrimary} />
         ) : (
-          <FontAwesome5 name="arrow-right" size={20} color="#fff" />
+          <FontAwesome5 name="arrow-right" size={20} color={t.colors.onPrimary} />
         )}
-      </Pressable>
-    </SafeAreaView>
+      </PressableScale>
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
+const useStyles = makeStyles((t) => ({
   top: {
-    paddingHorizontal: 24,
-    paddingTop: 70,
+    paddingHorizontal: t.spacing.xxl,
+    paddingTop: t.spacing.md,
   },
-  skip: {
-    position: "absolute",
-    right: 24,
-    top: 84,
-  },
-  skipText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#6c757d",
-  },
-  content: {
-    paddingHorizontal: 24,
-    paddingBottom: 130,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#212529",
-    marginTop: 8,
-    marginBottom: 8,
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: t.spacing.lg,
   },
   subtitle: {
-    fontSize: 15,
-    color: "#6c757d",
-    marginBottom: 24,
+    marginTop: t.spacing.sm,
+    marginBottom: t.spacing.xxl,
+  },
+  content: {
+    paddingHorizontal: t.spacing.xxl,
+    paddingBottom: 140,
   },
   fab: {
     position: "absolute",
-    bottom: 40,
-    right: 24,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#212529",
+    right: t.spacing.xxl,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: t.colors.primary,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    ...t.shadow(6),
   },
-});
+  fabDisabled: {
+    backgroundColor: t.colors.surfaceAlt,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+}));

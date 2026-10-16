@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Alert, StyleSheet, Text, TextInput } from "react-native";
+import { Alert } from "react-native";
 import OnboardingStepLayout from "../../components/OnboardingStepLayout";
 import PromptEditor from "../../components/PromptEditor";
 import { useAuth } from "../../context/AuthProvider";
+import { AppText, haptics, TextField } from "../../ui";
 
 const BIO_MAX = 500;
 
@@ -19,8 +20,9 @@ export default function OnboardingPrompts() {
       bio: bio.trim() || null,
     });
     setLoading(false);
-    if (error) Alert.alert("Error", error.message);
-    // On success onboarding is complete; the guard in _layout.js opens the app.
+    if (error) return Alert.alert("Error", error.message);
+    // Onboarding is complete; the guard in _layout.js opens the app
+    haptics.success();
   };
 
   return (
@@ -34,44 +36,17 @@ export default function OnboardingPrompts() {
     >
       <PromptEditor value={prompts} onChange={setPrompts} />
 
-      <Text style={styles.label}>Bio (optional)</Text>
-      <TextInput
-        style={styles.bio}
+      <AppText variant="title" style={{ marginTop: 28, marginBottom: 10 }}>
+        Bio (optional)
+      </AppText>
+      <TextField
         placeholder="A few lines about you…"
-        placeholderTextColor="#adb5bd"
         value={bio}
         onChangeText={setBio}
         maxLength={BIO_MAX}
+        showCount
         multiline
       />
-      <Text style={styles.counter}>
-        {bio.length}/{BIO_MAX}
-      </Text>
     </OnboardingStepLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  label: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#212529",
-    marginTop: 28,
-    marginBottom: 10,
-  },
-  bio: {
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-    borderRadius: 12,
-    padding: 14,
-    minHeight: 100,
-    fontSize: 16,
-    textAlignVertical: "top",
-  },
-  counter: {
-    alignSelf: "flex-end",
-    fontSize: 12,
-    color: "#adb5bd",
-    marginTop: 4,
-  },
-});

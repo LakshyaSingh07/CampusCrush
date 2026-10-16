@@ -1,51 +1,22 @@
-import { FontAwesome5 } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import TabBar from "../../components/TabBar";
+import { useTheme } from "../../theme";
 
 export default function TabsLayout() {
+  const t = useTheme();
   return (
     <Tabs
+      tabBar={(props) => <TabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#7B61FF",
-        tabBarInactiveTintColor: "#adb5bd",
+        animation: "shift",
+        sceneStyle: { backgroundColor: t.colors.bg },
       }}
     >
-      <Tabs.Screen
-        name="home"
-        options={{
-          title: "Discover",
-          tabBarIcon: ({ color }) => (
-            <FontAwesome5 name="fire" size={22} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="liked-you"
-        options={{
-          title: "Liked You",
-          tabBarIcon: ({ color }) => (
-            <FontAwesome5 name="heart" solid size={22} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="chats"
-        options={{
-          title: "Chats",
-          tabBarIcon: ({ color }) => (
-            <FontAwesome5 name="comment" solid size={22} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          tabBarIcon: ({ color }) => (
-            <FontAwesome5 name="user" solid size={22} color={color} />
-          ),
-        }}
-      />
+      <Tabs.Screen name="home" options={{ title: "Discover" }} />
+      <Tabs.Screen name="liked-you" options={{ title: "Liked You" }} />
+      <Tabs.Screen name="chats" options={{ title: "Chats" }} />
+      <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>
   );
 }

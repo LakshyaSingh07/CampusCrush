@@ -1,187 +1,105 @@
-import { FontAwesome5 } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import {
-  ActivityIndicator,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { useMemo, useState } from "react";
+import { Alert, View } from "react-native";
 import WheelPickerExpo from "react-native-wheel-picker-expo";
-import CustomAlert from "../../components/CustomAlert";
-import OnboardingProgress from "../../components/OnboardingProgress";
+import OnboardingStepLayout from "../../components/OnboardingStepLayout";
 import { useAuth } from "../../context/AuthProvider";
+import { makeStyles, useTheme } from "../../theme";
+import { AppText, haptics } from "../../ui";
 
 const MIN_HEIGHT_CM = 150;
 const MAX_HEIGHT_CM = 210;
 
-const initialAlertState = {
-  visible: false,
-  title: "",
-  message: "",
-  buttons: [],
+const toFeet = (cm) => {
+  const inches = Math.round(cm / 2.54);
+  return `${Math.floor(inches / 12)}′${inches % 12}″`;
 };
 
-export default function Step4() {
+export default function OnboardingStep4() {
   const router = useRouter();
+  const t = useTheme();
+  const styles = useStyles();
   const { profile, updateProfile } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [alert, setAlert] = useState(initialAlertState);
   const [selectedHeight, setSelectedHeight] = useState(
-    profile?.height_cm >= MIN_HEIGHT_CM && profile?.height_cm <= MAX_HEIGHT_CM
-      ? profile.height_cm
-      : 160
+    profile?.height_cm >= MIN_HEIGHT_CM && profile?.height_cm <= MAX_HEIGHT_CM ? profile.height_cm : 165
+  );
+
+  const heightOptions = useMemo(
+    () =>
+      Array.from({ length: MAX_HEIGHT_CM - MIN_HEIGHT_CM + 1 }, (_, i) => ({
+        label: `${MIN_HEIGHT_CM + i} cm`,
+        value: MIN_HEIGHT_CM + i,
+      })),
+    []
   );
 
   const handleNext = async () => {
-    if (loading) return;
     setLoading(true);
     const { error } = await updateProfile({ height_cm: selectedHeight });
-    if (error) {
-      setAlert({
-        visible: true,
-        title: "Error",
-        message: error.message,
-        buttons: [
-          {
-            text: "OK",
-            onPress: () => setAlert(initialAlertState),
-            style: "primary",
-          },
-        ],
-      });
-    } else {
-      router.push("/onboarding/step5");
-    }
     setLoading(false);
+    if (error) return Alert.alert("Error", error.message);
+    router.push("/onboarding/step5");
   };
 
-  const heightOptions = Array.from(
-    { length: MAX_HEIGHT_CM - MIN_HEIGHT_CM + 1 },
-    (_, i) => ({
-      label: `${MIN_HEIGHT_CM + i} cm`,
-      value: MIN_HEIGHT_CM + i,
-    })
-  );
-
   return (
-    <SafeAreaView style={styles.container}>
-      <OnboardingProgress step={4} />
-
-      {/* Heading */}
-      <Text style={styles.title}>Now, let’s talk about you</Text>
-      <Text style={styles.subtitle}>
-        Let’s get the small talk out of the way. We’ll get into the deep and
-        meaningful later.
-      </Text>
-
-      {/* Label */}
-      <Text style={styles.label}>Your height</Text>
-
-      {/* Wheel Picker */}
-      <View style={styles.pickerContainer}>
-        <WheelPickerExpo
-          height={420}
-          width="100%"
-          marginTop={50}
-          initialSelectedIndex={selectedHeight - MIN_HEIGHT_CM}
-          items={heightOptions}
-          onChange={({ item }) => setSelectedHeight(item.value)}
-          renderItem={({ label }) => (
-            <Text style={styles.pickerItem}>{label}</Text>
-          )}
-          style={styles.picker}
-        />
-        {/* Selection Indicator Box */}
-        <View style={styles.selectionBox} />
+    <OnboardingStepLayout
+      step={4}
+      title="Now, let’s talk about you"
+      subtitle="Let’s get the small talk out of the way. We’ll get into the deep and meaningful later."
+      loading={loading}
+      onNext={handleNext}
+      scroll={false}
+    >
+      <View style={styles.readout}>
+        <AppText variant="display">{selectedHeight} cm</AppText>
+        <AppText variant="bodyMedium" color="textSecondary">
+          {toFeet(selectedHeight)}
+        </AppText>
       </View>
 
-      {/* Floating Next Button */}
-      <TouchableOpacity
-        style={styles.nextButton}
-        onPress={handleNext}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <FontAwesome5 name="arrow-right" size={20} color="white" />
-        )}
-      </TouchableOpacity>
-
-      <CustomAlert {...alert} />
-    </SafeAreaView>
+      <View style={styles.pickerWrap}>
+        <WheelPickerExpo
+          height={260}
+          width="100%"
+          backgroundColor={t.colors.bg}
+          initialSelectedIndex={selectedHeight - MIN_HEIGHT_CM}
+          items={heightOptions}
+          onChange={({ item }) => {
+            setSelectedHeight(item.value);
+            haptics.select();
+          }}
+          renderItem={({ label }) => (
+            <AppText variant="title" style={styles.pickerItem}>
+              {label}
+            </AppText>
+          )}
+        />
+        <View style={styles.selectionBox} pointerEvents="none" />
+      </View>
+    </OnboardingStepLayout>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-    paddingTop: 70,
-    paddingHorizontal: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 10,
-    color: "#212529",
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#495057",
-    marginBottom: 30,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 0,
-    color: "#000",
-  },
-  pickerContainer: {
-    marginTop: 20,
-    // backgroundColor: "red",
-    justifyContent: "center",
+const useStyles = makeStyles((t) => ({
+  readout: {
     alignItems: "center",
-    width: "100%",
-    height: 500,
-    marginBottom: 20,
+    marginBottom: t.spacing.lg,
   },
-  picker: {
-    alignSelf: "center",
-    marginTop: 10,
+  pickerWrap: {
+    justifyContent: "center",
   },
   pickerItem: {
-    fontSize: 22,
     textAlign: "center",
-    color: "#000",
-    fontWeight: "600",
   },
   selectionBox: {
     position: "absolute",
-    top: "50%",
-    left: 20,
-    right: 20,
-    transform: [{ translateY: -35 }],
-    height: 70,
+    left: t.spacing.xl,
+    right: t.spacing.xl,
+    height: 52,
+    borderRadius: t.radius.md,
     borderWidth: 2,
-    borderColor: "#000",
-    borderRadius: 8,
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-    pointerEvents: "none",
+    borderColor: t.colors.primary,
+    backgroundColor: "transparent",
   },
-  nextButton: {
-    position: "absolute",
-    bottom: 30,
-    right: 20,
-    backgroundColor: "black",
-    width: 55,
-    height: 55,
-    borderRadius: 50,
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 5,
-  },
-});
+}));

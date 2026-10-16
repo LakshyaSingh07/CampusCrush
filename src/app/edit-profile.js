@@ -1,68 +1,64 @@
-import { FontAwesome5 } from "@expo/vector-icons";
-import { Image } from "expo-image";
-import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Alert, ScrollView, View } from "react-native";
+import Animated from "react-native-reanimated";
 import InterestPicker from "../components/InterestPicker";
 import LifestyleFields from "../components/LifestyleFields";
+import PhotoGrid from "../components/PhotoGrid";
 import PromptEditor from "../components/PromptEditor";
 import SelectField from "../components/SelectField";
 import { useAuth } from "../context/AuthProvider";
-import { MIN_INTERESTS, RELATIONSHIP_GOALS } from "../lib/profileOptions";
-import {
-  deleteRemovedPhotos,
-  resizedImageUrl,
-  uploadPhotos,
-} from "../lib/cloudinary";
+import { deleteRemovedPhotos, uploadPhotos } from "../lib/cloudinary";
 import {
   DEPARTMENT_OPTIONS,
   GENDER_OPTIONS,
+  getGraduationYearOptions,
   INTEREST_OPTIONS,
+  interestLabelFor,
   MAX_PHOTOS,
   MIN_PHOTOS_REQUIRED,
-  getGraduationYearOptions,
-  interestLabelFor,
 } from "../lib/onboarding";
+import { MIN_INTERESTS, RELATIONSHIP_GOALS } from "../lib/profileOptions";
+import { makeStyles } from "../theme";
+import { AppText, enter, haptics, PressableScale, Screen, TextField } from "../ui";
 
 const BIO_MAX = 500;
 const HEIGHT_OPTIONS = Array.from({ length: 61 }, (_, i) => `${150 + i} cm`);
 
 // Each slot holds { url } for a saved photo, { uri, mimeType } for a newly
 // picked one, or null.
-const toSlots = (urls = []) =>
-  Array.from({ length: MAX_PHOTOS }, (_, i) => (urls[i] ? { url: urls[i] } : null));
+const toSlots = (urls = []) => Array.from({ length: MAX_PHOTOS }, (_, i) => (urls[i] ? { url: urls[i] } : null));
+
+function Section({ title, hint, index, children }) {
+  const styles = useStyles();
+  return (
+    <Animated.View entering={enter(index)} style={styles.section}>
+      <AppText variant="label" color="textSecondary">
+        {title}
+      </AppText>
+      {hint ? (
+        <AppText variant="caption" color="textMuted" style={{ marginTop: 4 }}>
+          {hint}
+        </AppText>
+      ) : null}
+      <View style={{ marginTop: 14 }}>{children}</View>
+    </Animated.View>
+  );
+}
 
 export default function EditProfileScreen() {
   const router = useRouter();
+  const styles = useStyles();
   const { profile, updateProfile } = useAuth();
 
   const [photos, setPhotos] = useState(() => toSlots(profile?.profile_image_urls));
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [department, setDepartment] = useState(profile?.department ?? "");
-  const [gradYear, setGradYear] = useState(
-    profile?.grad_year ? String(profile.grad_year) : ""
-  );
-  const [height, setHeight] = useState(
-    profile?.height_cm ? `${profile.height_cm} cm` : ""
-  );
+  const [gradYear, setGradYear] = useState(profile?.grad_year ? String(profile.grad_year) : "");
+  const [height, setHeight] = useState(profile?.height_cm ? `${profile.height_cm} cm` : "");
   const [gender, setGender] = useState(profile?.gender ?? "");
   const [interest, setInterest] = useState(interestLabelFor(profile?.interested_in));
-  const [goal, setGoal] = useState(
-    RELATIONSHIP_GOALS.find((g) => g.value === profile?.relationship_goal)?.label ?? ""
-  );
+  const [goal, setGoal] = useState(RELATIONSHIP_GOALS.find((g) => g.value === profile?.relationship_goal)?.label ?? "");
   const [interestTags, setInterestTags] = useState(profile?.interests ?? []);
   const [lifestyle, setLifestyle] = useState({
     drinker_status: profile?.drinker_status ?? null,
@@ -80,54 +76,20 @@ export default function EditProfileScreen() {
     return gradYear && !years.includes(gradYear) ? [gradYear, ...years] : years;
   }, [gradYear]);
 
-  const photoCount = photos.filter(Boolean).length;
-
-  const pickPhoto = async (index) => {
-    if (saving) return;
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission needed", "We need access to your photos to add one.");
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [3, 4],
-      quality: 0.8,
-    });
-    if (result.canceled) return;
-    const { uri, mimeType } = result.assets[0];
-    setPhotos((prev) => {
-      const next = [...prev];
-      next[index] = { uri, mimeType };
-      return next;
-    });
-  };
-
-  const removePhoto = (index) => {
-    if (saving) return;
-    setPhotos((prev) => {
-      const next = [...prev];
-      next[index] = null;
-      return next;
-    });
-  };
-
   const save = async () => {
-    if (photoCount < MIN_PHOTOS_REQUIRED) {
-      Alert.alert("Add more photos", `You need at least ${MIN_PHOTOS_REQUIRED} photos.`);
-      return;
-    }
-    if (!department || !gradYear || !height || !gender || !interest || !goal) {
-      Alert.alert("Incomplete", "Please fill in all the fields.");
-      return;
-    }
-    if (interestTags.length < MIN_INTERESTS) {
-      Alert.alert("Add more interests", `Pick at least ${MIN_INTERESTS} interests.`);
-      return;
-    }
-    if (prompts.length < 1) {
-      Alert.alert("Add a prompt", "Answer at least one prompt.");
+    const problem =
+      photos.filter(Boolean).length < MIN_PHOTOS_REQUIRED
+        ? `You need at least ${MIN_PHOTOS_REQUIRED} photos.`
+        : !department || !gradYear || !height || !gender || !interest || !goal
+          ? "Please fill in all the details."
+          : interestTags.length < MIN_INTERESTS
+            ? `Pick at least ${MIN_INTERESTS} interests.`
+            : prompts.length < 1
+              ? "Answer at least one prompt."
+              : null;
+    if (problem) {
+      haptics.warning();
+      Alert.alert("Almost there", problem);
       return;
     }
 
@@ -157,6 +119,7 @@ export default function EditProfileScreen() {
 
       const previousUrls = profile?.profile_image_urls ?? [];
       deleteRemovedPhotos(previousUrls.filter((url) => !urls.includes(url)));
+      haptics.success();
       router.back();
     } catch (e) {
       Alert.alert("Couldn't save", e.message || "Something went wrong. Please try again.");
@@ -166,228 +129,95 @@ export default function EditProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Screen keyboard>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10} disabled={saving}>
-          <Text style={styles.headerCancel}>Cancel</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>Edit profile</Text>
-        <Pressable onPress={save} hitSlop={10} disabled={saving}>
-          {saving ? (
-            <ActivityIndicator color="#7B61FF" />
-          ) : (
-            <Text style={styles.headerSave}>Save</Text>
-          )}
-        </Pressable>
+        <PressableScale onPress={() => router.back()} hitSlop={10} disabled={saving}>
+          <AppText variant="bodyMedium" color="textSecondary">
+            Cancel
+          </AppText>
+        </PressableScale>
+        <AppText variant="title">Edit profile</AppText>
+        <PressableScale onPress={save} hitSlop={10} disabled={saving} haptic="light">
+          <View style={styles.saveButton}>
+            <AppText variant="bodyStrong" color="onPrimary">
+              {saving ? "Saving…" : "Save"}
+            </AppText>
+          </View>
+        </PressableScale>
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <ScrollView contentContainerStyle={styles.content}>
-          <Text style={styles.sectionTitle}>Photos</Text>
-          <Text style={styles.hint}>
-            At least {MIN_PHOTOS_REQUIRED}. Your first photo is the one people
-            see first.
-          </Text>
-          <View style={styles.grid}>
-            {photos.map((photo, index) => (
-              <Pressable key={index} style={styles.slot} onPress={() => pickPhoto(index)}>
-                {photo ? (
-                  <>
-                    <Image
-                      source={{ uri: photo.url ? resizedImageUrl(photo.url, 300) : photo.uri }}
-                      style={StyleSheet.absoluteFill}
-                      contentFit="cover"
-                    />
-                    <Pressable
-                      style={styles.removeButton}
-                      onPress={() => removePhoto(index)}
-                      hitSlop={6}
-                    >
-                      <FontAwesome5 name="times" size={12} color="#fff" />
-                    </Pressable>
-                  </>
-                ) : (
-                  <FontAwesome5 name="plus" size={22} color="#adb5bd" />
-                )}
-              </Pressable>
-            ))}
-          </View>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <Section index={0} title="Photos" hint={`At least ${MIN_PHOTOS_REQUIRED}. Your first photo is the one people see first.`}>
+          <PhotoGrid photos={photos} onChange={setPhotos} disabled={saving} />
+        </Section>
 
-          <Text style={styles.sectionTitle}>About me</Text>
-          <TextInput
-            style={styles.bio}
-            placeholder="A few lines about you: what you study, what you're into, your go-to campus spot..."
-            placeholderTextColor="#adb5bd"
+        <Section index={1} title="About me">
+          <TextField
+            placeholder="A few lines about you: what you study, what you're into, your go-to campus spot…"
             value={bio}
             onChangeText={setBio}
             maxLength={BIO_MAX}
+            showCount
             multiline
           />
-          <Text style={styles.counter}>
-            {bio.length}/{BIO_MAX}
-          </Text>
+        </Section>
 
-          <Text style={styles.sectionTitle}>Prompts</Text>
+        <Section index={2} title="Prompts">
           <PromptEditor value={prompts} onChange={setPrompts} />
+        </Section>
 
-          <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Interests</Text>
+        <Section index={3} title="Interests">
           <InterestPicker value={interestTags} onChange={setInterestTags} />
+        </Section>
 
-          <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Looking for</Text>
-          <SelectField
-            label="What are you looking for?"
-            placeholder="Select"
-            value={goal}
-            options={RELATIONSHIP_GOALS.map((g) => g.label)}
-            onSelect={setGoal}
-          />
+        <Section index={4} title="Looking for">
+          <SelectField label="What are you looking for?" placeholder="Select" value={goal} options={RELATIONSHIP_GOALS.map((g) => g.label)} onSelect={setGoal} />
+          <SelectField label="Show me" placeholder="Select who you'd like to see" value={interest} options={INTEREST_OPTIONS.map((o) => o.label)} onSelect={setInterest} />
+        </Section>
 
-          <Text style={styles.sectionTitle}>Lifestyle</Text>
+        <Section index={5} title="Lifestyle">
           <LifestyleFields values={lifestyle} onChange={setLifestyle} />
+        </Section>
 
-          <Text style={styles.sectionTitle}>Details</Text>
-          <SelectField
-            label="Department"
-            placeholder="Select department"
-            value={department}
-            options={DEPARTMENT_OPTIONS}
-            onSelect={setDepartment}
-          />
-          <SelectField
-            label="Graduation year"
-            placeholder="Select year"
-            value={gradYear}
-            options={gradYearOptions}
-            onSelect={setGradYear}
-          />
-          <SelectField
-            label="Height"
-            placeholder="Select height"
-            value={height}
-            options={HEIGHT_OPTIONS}
-            onSelect={setHeight}
-          />
-          <SelectField
-            label="Gender"
-            placeholder="Select gender"
-            value={gender}
-            options={GENDER_OPTIONS}
-            onSelect={setGender}
-          />
-          <SelectField
-            label="Show me"
-            placeholder="Select who you'd like to see"
-            value={interest}
-            options={INTEREST_OPTIONS.map((o) => o.label)}
-            onSelect={setInterest}
-          />
+        <Section index={6} title="Details">
+          <SelectField label="Department" placeholder="Select department" value={department} options={DEPARTMENT_OPTIONS} onSelect={setDepartment} />
+          <SelectField label="Graduation year" placeholder="Select year" value={gradYear} options={gradYearOptions} onSelect={setGradYear} />
+          <SelectField label="Height" placeholder="Select height" value={height} options={HEIGHT_OPTIONS} onSelect={setHeight} />
+          <SelectField label="Gender" placeholder="Select gender" value={gender} options={GENDER_OPTIONS} onSelect={setGender} />
+        </Section>
 
-          <Text style={styles.locked}>
-            Your name and birthday can&apos;t be changed here.
-          </Text>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        <AppText variant="caption" color="textMuted" style={{ textAlign: "center" }}>
+          Your name and birthday can&apos;t be changed here.
+        </AppText>
+      </ScrollView>
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
+const useStyles = makeStyles((t) => ({
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#dee2e6",
+    paddingHorizontal: t.spacing.xl,
+    paddingVertical: t.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: t.colors.border,
   },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#212529",
-  },
-  headerCancel: {
-    fontSize: 16,
-    color: "#6c757d",
-  },
-  headerSave: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#7B61FF",
+  saveButton: {
+    backgroundColor: t.colors.primary,
+    borderRadius: t.radius.pill,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
   },
   content: {
-    padding: 20,
+    padding: t.spacing.lg,
     paddingBottom: 60,
   },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#7B61FF",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginTop: 8,
-    marginBottom: 8,
+  section: {
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radius.xl,
+    padding: t.spacing.lg,
+    marginBottom: t.spacing.lg,
   },
-  hint: {
-    fontSize: 13,
-    color: "#6c757d",
-    marginBottom: 12,
-  },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  slot: {
-    width: "31%",
-    aspectRatio: 3 / 4,
-    borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: "#f1f3f5",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  removeButton: {
-    position: "absolute",
-    right: 4,
-    bottom: 4,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  bio: {
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-    borderRadius: 12,
-    padding: 14,
-    minHeight: 110,
-    fontSize: 16,
-    textAlignVertical: "top",
-  },
-  counter: {
-    alignSelf: "flex-end",
-    fontSize: 12,
-    color: "#adb5bd",
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  locked: {
-    fontSize: 13,
-    color: "#adb5bd",
-    textAlign: "center",
-    marginTop: 8,
-  },
-});
+}));

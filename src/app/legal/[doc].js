@@ -1,82 +1,62 @@
-import { FontAwesome5 } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, View } from "react-native";
+import Animated from "react-native-reanimated";
 import { LEGAL_DOCS, LEGAL_LAST_UPDATED } from "../../content/legal";
+import { makeStyles } from "../../theme";
+import { AppText, enter, IconButton, Screen } from "../../ui";
 
 export default function LegalScreen() {
   const router = useRouter();
+  const styles = useStyles();
   const { doc } = useLocalSearchParams();
   const content = LEGAL_DOCS[doc];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Screen>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10}>
-          <FontAwesome5 name="arrow-left" size={20} color="#212529" />
-        </Pressable>
-        <Text style={styles.headerTitle}>{content?.title ?? "Not found"}</Text>
+        <IconButton icon="arrow-left" size={40} background="surfaceAlt" onPress={() => router.back()} accessibilityLabel="Back" />
+        <AppText variant="title">{content?.title ?? "Not found"}</AppText>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         {content ? (
           <>
-            <Text style={styles.updated}>Last updated {LEGAL_LAST_UPDATED}</Text>
-            {content.sections.map((section) => (
-              <View key={section.heading} style={styles.section}>
-                <Text style={styles.heading}>{section.heading}</Text>
-                <Text style={styles.body}>{section.body}</Text>
-              </View>
+            <AppText variant="caption" color="textMuted" style={{ marginBottom: 16 }}>
+              Last updated {LEGAL_LAST_UPDATED}
+            </AppText>
+            {content.sections.map((section, i) => (
+              <Animated.View key={section.heading} entering={enter(i)} style={styles.section}>
+                <AppText variant="title" style={{ marginBottom: 6 }}>
+                  {section.heading}
+                </AppText>
+                <AppText color="textSecondary">{section.body}</AppText>
+              </Animated.View>
             ))}
           </>
         ) : (
-          <Text style={styles.body}>This page doesn&apos;t exist.</Text>
+          <AppText color="textSecondary">This page doesn&apos;t exist.</AppText>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
+const useStyles = makeStyles((t) => ({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#dee2e6",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#212529",
+    gap: t.spacing.lg,
+    paddingHorizontal: t.spacing.xl,
+    paddingVertical: t.spacing.md,
   },
   content: {
-    padding: 20,
+    padding: t.spacing.xl,
     paddingBottom: 48,
   },
-  updated: {
-    fontSize: 13,
-    color: "#adb5bd",
-    marginBottom: 16,
-  },
   section: {
-    marginBottom: 20,
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radius.lg,
+    padding: t.spacing.lg,
+    marginBottom: t.spacing.md,
   },
-  heading: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#212529",
-    marginBottom: 6,
-  },
-  body: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#495057",
-  },
-});
+}));

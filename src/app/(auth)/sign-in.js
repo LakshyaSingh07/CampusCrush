@@ -1,267 +1,113 @@
-import { FontAwesome5 } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Animated,
-  Easing,
-  Keyboard,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableWithoutFeedback,
-  View,
-} from "react-native";
-import CustomAlert from "../../components/CustomAlert";
-import { isAllowedEmail, normalizeEmail } from "../../lib/onboarding";
+import { useState } from "react";
+import { View } from "react-native";
+import Animated from "react-native-reanimated";
+import Chip from "../../components/Chip";
+import { ALLOWED_EMAIL_DOMAINS, isAllowedEmail, normalizeEmail } from "../../lib/onboarding";
 import { supabase } from "../../lib/supabase";
-
-// Initial state for the custom alert
-const initialAlertState = {
-  visible: false,
-  title: "",
-  message: "",
-  buttons: [],
-};
+import { makeStyles } from "../../theme";
+import { AppText, Button, enter, haptics, IconButton, Screen, TextField } from "../../ui";
 
 export default function SignInScreen() {
   const router = useRouter();
+  const styles = useStyles();
   const [email, setEmail] = useState("");
+  const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const [alert, setAlert] = useState(initialAlertState);
+  // While the user hasn't typed "@" yet, offer the university domains
+  const localPart = email.trim();
+  const showDomainChips = localPart.length > 0 && !localPart.includes("@");
 
-  // Animated value for the card
-  const cardTranslateY = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const keyboardShowListener = Keyboard.addListener(
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
-      (event) => {
-        Animated.timing(cardTranslateY, {
-          toValue: -40, // Adjust this for how far up you want the card to move
-          duration: 250,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.ease),
-        }).start();
-      }
-    );
-
-    const keyboardHideListener = Keyboard.addListener(
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
-      () => {
-        Animated.timing(cardTranslateY, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.ease),
-        }).start();
-      }
-    );
-
-    return () => {
-      keyboardShowListener.remove();
-      keyboardHideListener.remove();
-    };
-  }, [cardTranslateY]);
-
-  // This function will handle the sign-in logic
-  const signInWithOtp = async () => {
-    // 1. Start loading
-    setLoading(true);
-
-    // 2. Validate the email domain (also enforced server-side by the
-    // handle_new_user trigger)
+  const sendCode = async () => {
     const normalizedEmail = normalizeEmail(email);
     if (!isAllowedEmail(normalizedEmail)) {
-      // Show custom alert if the email is invalid
-      setAlert({
-        visible: true,
-        title: "Invalid Email",
-        message: "Please use a valid Galgotias University email address.",
-        buttons: [
-          {
-            text: "OK",
-            style: "primary",
-            onPress: () => setAlert(initialAlertState),
-          },
-        ],
-      });
-      setLoading(false);
+      haptics.warning();
+      setError("Please use your Galgotias University email address.");
       return;
     }
-
-    // 3. If valid, attempt to send OTP via Supabase
+    setError(null);
+    setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: normalizedEmail,
-      });
-
-      if (error) {
-        // Show error from Supabase
-        setAlert({
-          visible: true,
-          title: "Error",
-          message: error.message,
-          buttons: [
-            {
-              text: "OK",
-              onPress: () => setAlert(initialAlertState),
-              style: "primary",
-            },
-          ],
-        });
-      } else {
-        router.push({
-          pathname: "/verify-otp",
-          params: { email: normalizedEmail },
-        });
+      const { error: otpError } = await supabase.auth.signInWithOtp({ email: normalizedEmail });
+      if (otpError) {
+        haptics.warning();
+        setError(otpError.message);
+        return;
       }
+      router.push({ pathname: "/verify-otp", params: { email: normalizedEmail } });
     } catch (_e) {
-      setAlert({
-        visible: true,
-        title: "Error",
-        message: "An unexpected error occurred. Please try again.",
-        buttons: [
-          {
-            text: "OK",
-            onPress: () => setAlert(initialAlertState),
-            style: "primary",
-          },
-        ],
-      });
+      setError("Something went wrong. Check your connection and try again.");
     } finally {
-      // 4. Stop loading
       setLoading(false);
     }
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <SafeAreaView style={styles.container}>
-        {/* Custom Alert Modal */}
-        <CustomAlert
-          visible={alert.visible}
-          title={alert.title}
-          message={alert.message}
-          buttons={alert.buttons}
-        />
+    <Screen keyboard>
+      <View style={styles.container}>
+        <IconButton icon="arrow-left" size={40} background="surfaceAlt" onPress={() => router.back()} accessibilityLabel="Back" />
 
-        {/* Back Button */}
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <FontAwesome5 name="arrow-left" size={24} color="#343a40" />
-        </Pressable>
-
-        <View style={styles.header}>
-          <Text style={styles.title}>Can we get your email, please?</Text>
-          <Text style={styles.subtitle}>
-            We only use emails to make sure everyone on CampusCrush is real.
-          </Text>
-        </View>
-
-        <Animated.View
-          style={[styles.card, { transform: [{ translateY: cardTranslateY }] }]}
-        >
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="your.name@galgotiasuniversity.ac.in"
-            placeholderTextColor="#888"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-          <Pressable
-            style={styles.button}
-            onPress={signInWithOtp}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Register</Text>
-            )}
-          </Pressable>
+        <Animated.View entering={enter(0)} style={styles.header}>
+          <AppText variant="h1">Can we get your email, please?</AppText>
+          <AppText color="textSecondary" style={{ marginTop: 10 }}>
+            We only use it to make sure everyone on CampusCrush is a real Galgotias student.
+          </AppText>
         </Animated.View>
-      </SafeAreaView>
-    </TouchableWithoutFeedback>
+
+        <Animated.View entering={enter(1)}>
+          <TextField
+            label="University email"
+            placeholder="your.name@galgotiasuniversity.ac.in"
+            value={email}
+            onChangeText={(text) => {
+              setEmail(text);
+              if (error) setError(null);
+            }}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            autoComplete="email"
+            textContentType="emailAddress"
+            returnKeyType="send"
+            onSubmitEditing={sendCode}
+            error={error}
+            autoFocus
+          />
+
+          {showDomainChips && (
+            <View style={styles.chips}>
+              {ALLOWED_EMAIL_DOMAINS.map((domain) => (
+                <Chip key={domain} label={`@${domain}`} onPress={() => setEmail(`${localPart}@${domain}`)} />
+              ))}
+            </View>
+          )}
+        </Animated.View>
+
+        <View style={{ flex: 1 }} />
+
+        <Animated.View entering={enter(2)}>
+          <Button title="Send me a code" onPress={sendCode} loading={loading} disabled={!email.trim()} haptic="medium" />
+        </Animated.View>
+      </View>
+    </Screen>
   );
 }
 
-// --- Styles ---
-const styles = StyleSheet.create({
-  avoidingView: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  backButton: {
-    position: "absolute",
-    top: 65,
-    left: 24,
-    zIndex: 1,
-  },
+const useStyles = makeStyles((t) => ({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa", // A very light grey background
-    // padding: 24,
+    padding: t.spacing.xxl,
+    paddingTop: t.spacing.md,
   },
   header: {
-    marginTop: 120,
-    paddingHorizontal: 24,
-    marginBottom: 40,
+    marginTop: t.spacing.xxl,
+    marginBottom: t.spacing.xxxl,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#343a40",
-    marginBottom: 16,
+  chips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: t.spacing.sm,
+    marginTop: t.spacing.md,
   },
-  subtitle: {
-    fontSize: 16,
-    color: "#6c757d",
-  },
-  card: {
-    marginHorizontal: 24,
-    marginTop: 50,
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  label: {
-    fontSize: 14,
-    color: "#6c757d",
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: "#f8f9fa",
-    padding: 16,
-    borderRadius: 8,
-    fontSize: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-  },
-  button: {
-    backgroundColor: "#7B61FF", // Using the same purple from the welcome screen
-    padding: 16,
-    borderRadius: 30,
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-});
+}));

@@ -1,36 +1,26 @@
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Alert, ScrollView, View } from "react-native";
+import Animated from "react-native-reanimated";
 import { HOUSE_RULES } from "../../content/legal";
 import { useAuth } from "../../context/AuthProvider";
 import { getNextOnboardingRoute } from "../../lib/onboarding";
+import { makeStyles, useTheme } from "../../theme";
+import { AppText, Button, enter, Screen } from "../../ui";
 
 export default function HouseRulesScreen() {
   const router = useRouter();
+  const t = useTheme();
+  const styles = useStyles();
   const { updateProfile } = useAuth();
   const [saving, setSaving] = useState(false);
 
   const accept = async () => {
-    if (saving) return;
     setSaving(true);
-    const { data, error } = await updateProfile({
-      accepted_terms_at: new Date().toISOString(),
-    });
+    const { data, error } = await updateProfile({ accepted_terms_at: new Date().toISOString() });
     setSaving(false);
-    if (error) {
-      Alert.alert("Error", error.message);
-      return;
-    }
+    if (error) return Alert.alert("Error", error.message);
     // New users continue to step 1. Existing users who only needed to accept
     // the rules are sent to the app by the guard in _layout.js.
     const next = getNextOnboardingRoute(data);
@@ -38,116 +28,91 @@ export default function HouseRulesScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Welcome to CampusCrush</Text>
-        <Text style={styles.subtitle}>
-          Please follow these house rules so everyone has a good time.
-        </Text>
+    <Screen>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Animated.View entering={enter(0)}>
+          <AppText style={styles.wave}>👋</AppText>
+          <AppText variant="h1">Welcome to CampusCrush</AppText>
+          <AppText color="textSecondary" style={styles.subtitle}>
+            Please follow these house rules so everyone has a good time.
+          </AppText>
+        </Animated.View>
 
-        {HOUSE_RULES.map((rule) => (
-          <View key={rule.title} style={styles.rule}>
+        {HOUSE_RULES.map((rule, i) => (
+          <Animated.View key={rule.title} entering={enter(i + 1)} style={styles.rule}>
             <View style={styles.iconCircle}>
-              <FontAwesome5 name={rule.icon} size={18} color="#7B61FF" />
+              <FontAwesome5 name={rule.icon} size={17} color={t.colors.onPrimary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.ruleTitle}>{rule.title}</Text>
-              <Text style={styles.ruleText}>{rule.text}</Text>
+              <AppText variant="title">{rule.title}</AppText>
+              <AppText color="textSecondary" style={{ marginTop: 2 }}>
+                {rule.text}
+              </AppText>
             </View>
-          </View>
+          </Animated.View>
         ))}
 
-        <Text style={styles.legal}>
-          By tapping &quot;I agree&quot; you confirm you&apos;re 18 or older and
-          agree to our{" "}
-          <Text style={styles.link} onPress={() => router.push("/legal/guidelines")}>
-            Community Guidelines
-          </Text>{" "}
-          and{" "}
-          <Text style={styles.link} onPress={() => router.push("/legal/privacy")}>
-            Privacy Policy
-          </Text>
-          .
-        </Text>
+        <Animated.View entering={enter(6)}>
+          <AppText variant="caption" color="textSecondary" style={styles.legal}>
+            By tapping &quot;I agree&quot; you confirm you&apos;re 18 or older and agree to our{" "}
+            <AppText variant="caption" color="primaryPressed" style={styles.link} onPress={() => router.push("/legal/guidelines")}>
+              Community Guidelines
+            </AppText>{" "}
+            and{" "}
+            <AppText variant="caption" color="primaryPressed" style={styles.link} onPress={() => router.push("/legal/privacy")}>
+              Privacy Policy
+            </AppText>
+            .
+          </AppText>
+        </Animated.View>
       </ScrollView>
 
-      <Pressable style={styles.button} onPress={accept} disabled={saving}>
-        {saving ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>I agree</Text>
-        )}
-      </Pressable>
-    </SafeAreaView>
+      <View style={styles.footer}>
+        <Button title="I agree" onPress={accept} loading={saving} haptic="success" />
+      </View>
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
+const useStyles = makeStyles((t) => ({
   content: {
-    padding: 24,
-    paddingTop: 70,
+    padding: t.spacing.xxl,
+    paddingTop: t.spacing.xxxl,
   },
-  title: {
-    fontSize: 30,
-    fontWeight: "bold",
-    color: "#212529",
+  wave: {
+    fontSize: 44,
+    lineHeight: 54,
+    marginBottom: t.spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
-    color: "#6c757d",
-    marginTop: 8,
-    marginBottom: 28,
+    marginTop: t.spacing.sm,
+    marginBottom: t.spacing.xxl,
   },
   rule: {
     flexDirection: "row",
-    gap: 16,
-    marginBottom: 22,
+    gap: t.spacing.lg,
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radius.lg,
+    padding: t.spacing.lg,
+    marginBottom: t.spacing.md,
   },
   iconCircle: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: "#f3f0ff",
+    backgroundColor: t.colors.primary,
     justifyContent: "center",
     alignItems: "center",
   },
-  ruleTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#212529",
-  },
-  ruleText: {
-    fontSize: 15,
-    color: "#495057",
-    marginTop: 2,
-    lineHeight: 21,
-  },
   legal: {
-    fontSize: 14,
-    color: "#6c757d",
-    lineHeight: 20,
-    marginTop: 8,
+    marginTop: t.spacing.md,
   },
   link: {
-    color: "#7B61FF",
-    fontWeight: "600",
     textDecorationLine: "underline",
   },
-  button: {
-    backgroundColor: "#7B61FF",
-    marginHorizontal: 24,
-    marginBottom: 32,
-    paddingVertical: 16,
-    borderRadius: 30,
-    alignItems: "center",
+  footer: {
+    paddingHorizontal: t.spacing.xxl,
+    paddingTop: t.spacing.md,
+    paddingBottom: t.spacing.lg,
   },
-  buttonText: {
-    color: "#fff",
-    fontSize: 17,
-    fontWeight: "700",
-  },
-});
+}));

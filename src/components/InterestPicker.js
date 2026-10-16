@@ -1,19 +1,28 @@
-import { StyleSheet, Text, View } from "react-native";
+import { View } from "react-native";
 import { INTEREST_TAGS, MAX_INTERESTS } from "../lib/profileOptions";
+import { makeStyles } from "../theme";
+import { AppText, haptics } from "../ui";
 import Chip from "./Chip";
 
 export default function InterestPicker({ value = [], onChange }) {
-  const toggle = (tag) =>
-    onChange(
-      value.includes(tag) ? value.filter((t) => t !== tag) : [...value, tag]
-    );
+  const styles = useStyles();
   const isFull = value.length >= MAX_INTERESTS;
+
+  const toggle = (tag) => {
+    if (!value.includes(tag) && isFull) {
+      haptics.warning();
+      return;
+    }
+    onChange(value.includes(tag) ? value.filter((t) => t !== tag) : [...value, tag]);
+  };
 
   return (
     <View>
-      <Text style={styles.counter}>
-        {value.length}/{MAX_INTERESTS} selected
-      </Text>
+      <View style={styles.counter}>
+        <AppText variant="caption" color="onPrimary">
+          {value.length}/{MAX_INTERESTS} selected
+        </AppText>
+      </View>
       <View style={styles.wrap}>
         {INTEREST_TAGS.map((tag) => {
           const selected = value.includes(tag);
@@ -32,16 +41,18 @@ export default function InterestPicker({ value = [], onChange }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((t) => ({
   counter: {
-    fontSize: 13,
-    color: "#7B61FF",
-    fontWeight: "600",
-    marginBottom: 12,
+    alignSelf: "flex-start",
+    backgroundColor: t.colors.primary,
+    borderRadius: t.radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginBottom: t.spacing.lg,
   },
   wrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: t.spacing.sm,
   },
-});
+}));

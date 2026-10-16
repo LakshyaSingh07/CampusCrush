@@ -1,125 +1,116 @@
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useState } from "react";
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
-} from "react-native";
+import { Modal, Pressable, ScrollView, View } from "react-native";
+import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { makeStyles, useTheme } from "../theme";
+import { AppText, PressableScale } from "../ui";
 
-// A lightweight select field built with a modal list to avoid extra deps
+// Field that opens a bottom sheet of options
 export default function SelectField({ label, placeholder, value, options, onSelect }) {
+  const t = useTheme();
+  const styles = useStyles();
+  const insets = useSafeAreaInsets();
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <View style={{ marginBottom: 24 }}>
-      <Text style={styles.label}>{label}</Text>
-      <Pressable style={styles.select} onPress={() => setIsOpen(true)}>
-        <Text style={[styles.selectText, !value && { color: "#adb5bd" }]}>
+    <View style={{ marginBottom: 20 }}>
+      {label ? (
+        <AppText variant="caption" color="textSecondary" style={{ marginBottom: 8 }}>
+          {label}
+        </AppText>
+      ) : null}
+      <PressableScale style={styles.select} onPress={() => setIsOpen(true)} scaleTo={0.98} haptic="select">
+        <AppText variant="bodyMedium" color={value ? "text" : "textMuted"}>
           {value || placeholder}
-        </Text>
-        <FontAwesome5 name="chevron-down" size={14} color="#495057" />
-      </Pressable>
+        </AppText>
+        <FontAwesome5 name="chevron-down" size={13} color={t.colors.textSecondary} />
+      </PressableScale>
 
-      <Modal
-        visible={isOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsOpen(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setIsOpen(false)}>
-          <View style={styles.modalBackdrop}>
-            <TouchableWithoutFeedback>
-              <View style={styles.sheet}>
-                <Text style={styles.sheetTitle}>{label}</Text>
-                <ScrollView style={styles.optionList}>
-                  {options.map((option) => (
-                    <TouchableOpacity
-                      key={option}
-                      onPress={() => {
-                        onSelect(option);
-                        setIsOpen(false);
-                      }}
-                      style={styles.option}
-                    >
-                      <Text
-                        style={[
-                          styles.optionText,
-                          option === value && styles.optionSelected,
-                        ]}
-                      >
-                        {option}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
+      <Modal visible={isOpen} transparent animationType="none" onRequestClose={() => setIsOpen(false)}>
+        <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.backdrop}>
+          <Pressable style={{ flex: 1 }} onPress={() => setIsOpen(false)} />
+          <Animated.View
+            entering={SlideInDown.springify().damping(20)}
+            exiting={SlideOutDown}
+            style={[styles.sheet, { paddingBottom: insets.bottom + 12 }]}
+          >
+            <View style={styles.handle} />
+            <AppText variant="title" style={styles.sheetTitle}>
+              {label}
+            </AppText>
+            <ScrollView>
+              {options.map((option) => {
+                const selected = option === value;
+                return (
+                  <PressableScale
+                    key={option}
+                    scaleTo={0.98}
+                    haptic="select"
+                    onPress={() => {
+                      onSelect(option);
+                      setIsOpen(false);
+                    }}
+                    style={[styles.option, selected && styles.optionSelected]}
+                  >
+                    <AppText variant={selected ? "bodyStrong" : "body"}>{option}</AppText>
+                    {selected && <FontAwesome5 name="check" size={14} color={t.colors.primaryPressed} />}
+                  </PressableScale>
+                );
+              })}
+            </ScrollView>
+          </Animated.View>
+        </Animated.View>
       </Modal>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  label: {
-    fontSize: 16,
-    color: "#495057",
-    marginBottom: 8,
-  },
+const useStyles = makeStyles((t) => ({
   select: {
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    marginBottom: 4,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    backgroundColor: t.colors.surface,
+    borderWidth: 1.5,
+    borderColor: t.colors.border,
+    borderRadius: t.radius.md,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
   },
-  selectText: {
-    fontSize: 16,
-    color: "#212529",
-  },
-  modalBackdrop: {
+  backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "flex-end",
+    backgroundColor: t.colors.overlay,
   },
   sheet: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
+    backgroundColor: t.colors.surface,
+    borderTopLeftRadius: t.radius.xl,
+    borderTopRightRadius: t.radius.xl,
+    paddingHorizontal: t.spacing.lg,
+    paddingTop: t.spacing.md,
     maxHeight: "70%",
   },
-  sheetTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#343a40",
-    marginBottom: 8,
-    paddingHorizontal: 8,
+  handle: {
+    alignSelf: "center",
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: t.colors.border,
+    marginBottom: t.spacing.md,
   },
-  optionList: {
-    paddingVertical: 8,
+  sheetTitle: {
+    paddingHorizontal: t.spacing.sm,
+    marginBottom: t.spacing.sm,
   },
   option: {
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-  },
-  optionText: {
-    fontSize: 16,
-    color: "#212529",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 15,
+    paddingHorizontal: 14,
+    borderRadius: t.radius.md,
   },
   optionSelected: {
-    fontWeight: "700",
-    color: "#7B61FF",
+    backgroundColor: t.colors.primarySoft,
   },
-});
+}));
