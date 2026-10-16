@@ -50,12 +50,18 @@ npx supabase functions deploy delete-user     # account deletion
 Once `sign-upload` is deployed, delete the old unsigned upload preset
 (`campus_crush_unsigned`) in Cloudinary → Settings → Upload. The app no longer uses it.
 
+### Builds
+
+The EAS project is already linked (`extra.eas.projectId` in `app.json`). `.env` isn't uploaded to EAS, so `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` are stored as EAS environment variables (`eas env:list`).
+
+```bash
+npm install -g eas-cli
+eas build --platform android --profile preview   # installable APK for testers
+```
+
 ### Push notifications
 
-Notifications are sent from the database (`pg_net`) to Expo's push service. To receive them:
-
-1. Run `npx eas init` once. It adds `extra.eas.projectId` to `app.json`, which the app needs to get a push token.
-2. Use a development build (`npx expo run:android` / `run:ios`, or EAS Build). Expo Go on Android can't receive remote notifications.
+Notifications are sent from the database (`pg_net`) to Expo's push service. Expo Go on Android can't receive them, so use an EAS build. Android also needs Firebase Cloud Messaging credentials uploaded to EAS: see https://docs.expo.dev/push-notifications/fcm-credentials/.
 
 ### Moderation
 

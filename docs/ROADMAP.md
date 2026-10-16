@@ -10,7 +10,8 @@
 - ✅ Profile: preview, edit photos/bio/details, pause profile, logout, delete account
 - ✅ Safety: unmatch, block, report (reporting also blocks)
 - ✅ Database schema, RLS and server functions in `supabase/migrations/`, tested against Postgres 15
-- ⏳ Migrations not yet applied to the Supabase project; app not yet tested on a device
+- ✅ Deployed (2026-10-16): all migrations applied to the live project, `sign-upload` / `delete-photos` / `delete-user` deployed and tested live, unsigned Cloudinary preset deleted, EAS project linked
+- ⏳ Not yet tested on a real device; Android push needs Firebase (FCM) credentials
 
 ## 2. Original audit: bugs and gaps found (fixed in M0 unless noted)
 
@@ -54,7 +55,7 @@
 - [x] "Show me" (`interested_in`) question added to onboarding step 3
 - [x] Replace the README with real setup instructions
 - [x] Bug #11: Expo SDK 54 packages aligned (`expo-doctor` 18/18, Android bundle builds)
-- [ ] **Apply the migrations** (`supabase db push`) and check for an older profile-creating trigger (see note below)
+- [x] Migrations applied to the live project. The old trigger had the same name and was replaced; the empty draft `swipes`/`matches`/`messeges` tables were dropped by `20261014000000_replace_draft_tables.sql`
 - [ ] Test the full flow on a device: new user, returning user, user who stopped mid-onboarding, logout, delete account
 
 > **Before running the migrations:** look in the Supabase dashboard (Database → Triggers on `auth.users`) for any existing trigger that inserts into `profiles`. If one exists under a name other than `on_auth_user_created`, drop it. Otherwise both triggers insert a row and sign-up fails with a duplicate-key error.
@@ -75,7 +76,9 @@
 - [x] Push notifications for new matches and messages (DB triggers → Expo push via `pg_net`)
 - [x] Admin view for reports (`admin_reports` in the Supabase dashboard), bans, auto-hide after 3+ reporters
 - [x] Rate limits: 1,000 swipes/day, 20 messages/minute
-- [ ] `npx eas init` + development build, so push notifications can be tested
+- [x] `eas init` (project `@lakshyac99/galgotias-dating-app`), `eas.json` build profiles, Supabase URL/anon key stored as EAS environment variables
+- [ ] Firebase project + FCM V1 key uploaded to EAS (`eas credentials`) and `google-services.json`, so Android can receive push notifications
+- [ ] Apple Developer account, for iOS builds and push
 - [ ] Analytics for the funnel metrics in the PRD (PostHog / Amplitude)
 - [ ] Crash reporting (Sentry)
 - [ ] EAS Build internal distribution to 50–100 students
