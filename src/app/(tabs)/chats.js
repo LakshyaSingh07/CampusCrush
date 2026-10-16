@@ -123,12 +123,13 @@ export default function ChatsScreen() {
     }, [loadMatches])
   );
 
-  // Any new message in one of my matches (RLS limits what we receive)
-  // refreshes the list so previews and unread counts stay current.
+  // New messages and read receipts in my matches (RLS limits what we
+  // receive) refresh the list so previews and unread counts stay current.
   useEffect(() => {
     const channel = supabase
       .channel("chats-list")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => loadMatches())
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => loadMatches())
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "matches" }, () => loadMatches())
       .subscribe();
     return () => {
       supabase.removeChannel(channel);

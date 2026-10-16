@@ -1,11 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthProvider";
 
-// Premium status and free-tier limits from get_my_entitlements(). The server
-// enforces the limits; this is only for showing them.
+// Premium status, free-tier limits and badge counts from get_my_entitlements().
+// The server enforces the limits; this is only for showing them.
 const FREE_DEFAULTS = {
+  unread_count: 0,
+  new_match_count: 0,
   is_premium: false,
   premium_until: null,
   premium_plan: null,
@@ -38,6 +40,26 @@ export function EntitlementsProvider({ children }) {
   useEffect(() => {
     refresh();
   }, [refresh, userId]);
+
+  // Keep the badge counts live: new messages, read receipts and new matches
+  // (RLS limits the events to my own matches). Bursts are coalesced.
+  const debounce = useRef(null);
+  useEffect(() => {
+    if (!ready) return;
+    const refreshSoon = () => {
+      clearTimeout(debounce.current);
+      debounce.current = setTimeout(refresh, 400);
+    };
+    const channel = supabase
+      .channel(`badges:${userId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, refreshSoon)
+      .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, refreshSoon)
+      .subscribe();
+    return () => {
+      clearTimeout(debounce.current);
+      supabase.removeChannel(channel);
+    };
+  }, [ready, userId, refresh]);
 
   // Premium can expire, and swipe counts reset at midnight, while the app
   // sits in the background

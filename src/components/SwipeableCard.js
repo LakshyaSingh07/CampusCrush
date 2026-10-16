@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle } from "react";
-import { StyleSheet, useWindowDimensions } from "react-native";
+import { StyleSheet, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Extrapolation,
@@ -14,13 +14,16 @@ import { scheduleOnRN } from "react-native-worklets";
 import { useTheme } from "../theme";
 import { AppText, haptics } from "../ui";
 import ProfileCard from "./ProfileCard";
+import ProfileContent from "./ProfileContent";
 
 // Drag right to like, left to pass. The parent can also trigger a swipe
 // through the ref (for the buttons): ref.current.swipe("like").
 // `dragX` (optional shared value) mirrors the horizontal drag so the card
 // underneath can react to it.
+// `scrollable` shows the whole profile (ProfileContent) instead of a single
+// card: vertical drags scroll it, horizontal drags swipe.
 const SwipeableCard = forwardRef(function SwipeableCard(
-  { profile, onSwipe, onMorePress, onInfoPress, dragX, style },
+  { profile, onSwipe, onMorePress, onInfoPress, dragX, style, scrollable, bottomInset },
   ref
 ) {
   const t = useTheme();
@@ -66,10 +69,12 @@ const SwipeableCard = forwardRef(function SwipeableCard(
   );
 
   const pan = Gesture.Pan()
-    .activeOffsetX([-15, 15])
+    .activeOffsetX(scrollable ? [-20, 20] : [-15, 15])
+    // In scrollable mode a mostly-vertical drag belongs to the ScrollView
+    .failOffsetY(scrollable ? [-12, 12] : [-1000, 1000])
     .onUpdate((e) => {
       translateX.value = e.translationX;
-      translateY.value = e.translationY * 0.6;
+      translateY.value = scrollable ? 0 : e.translationY * 0.6;
     })
     .onEnd((e) => {
       const passedThreshold = Math.abs(translateX.value) > threshold;
@@ -109,8 +114,15 @@ const SwipeableCard = forwardRef(function SwipeableCard(
 
   return (
     <GestureDetector gesture={pan}>
-      <Animated.View style={[style, styles.shadow, cardStyle]}>
-        <ProfileCard profile={profile} style={styles.fill} onMorePress={onMorePress} onInfoPress={onInfoPress} />
+      <Animated.View style={[style, !scrollable && styles.shadow, cardStyle]}>
+        {scrollable ? (
+          // Opaque so the next profile underneath doesn't show between sections
+          <View style={[styles.fill, { backgroundColor: t.colors.bg }]}>
+            <ProfileContent profile={profile} onMorePress={onMorePress} bottomInset={bottomInset} gesture animate={false} />
+          </View>
+        ) : (
+          <ProfileCard profile={profile} style={styles.fill} onMorePress={onMorePress} onInfoPress={onInfoPress} />
+        )}
         <Animated.View style={[styles.tint, { backgroundColor: t.colors.primary }, likeTint]} pointerEvents="none" />
         <Animated.View style={[styles.tint, { backgroundColor: t.colors.pass }, passTint]} pointerEvents="none" />
         <Animated.View style={[styles.stamp, styles.likeStamp, { borderColor: t.colors.primary }, likeStyle]} pointerEvents="none">

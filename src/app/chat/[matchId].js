@@ -8,6 +8,7 @@ import ProfileDetails from "../../components/ProfileDetails";
 import SafetyMenu from "../../components/SafetyMenu";
 import TypingDots from "../../components/TypingDots";
 import { useAuth } from "../../context/AuthProvider";
+import { useEntitlements } from "../../context/EntitlementsProvider";
 import { resizedImageUrl } from "../../lib/cloudinary";
 import { formatTimeLeft, matchStatus } from "../../lib/matching";
 import { setActiveChat } from "../../lib/notifications";
@@ -42,9 +43,13 @@ export default function ChatScreen() {
   const typingTimer = useRef(null);
   const lastTypingSent = useRef(0);
 
-  const markRead = useCallback(() => {
-    supabase.rpc("mark_match_read", { p_match_id: matchId });
-  }, [matchId]);
+  const { refresh: refreshCounts } = useEntitlements();
+
+  // Supabase queries only run once awaited, so this must be awaited
+  const markRead = useCallback(async () => {
+    await supabase.rpc("mark_match_read", { p_match_id: matchId });
+    refreshCounts();
+  }, [matchId, refreshCounts]);
 
   const loadMatch = useCallback(async () => {
     const { data } = await supabase.rpc("get_my_matches");

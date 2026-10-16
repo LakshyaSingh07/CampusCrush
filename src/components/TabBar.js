@@ -4,7 +4,7 @@ import Animated, { useAnimatedStyle, withSpring } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useEntitlements } from "../context/EntitlementsProvider";
 import { makeStyles, useTheme } from "../theme";
-import { AppText, PressableScale, SPRING } from "../ui";
+import { AppText, pop, PressableScale, SPRING } from "../ui";
 
 const ICONS = {
   home: "fire",
@@ -13,7 +13,7 @@ const ICONS = {
   profile: "user",
 };
 
-function TabItem({ route, label, focused, onPress, badge }) {
+function TabItem({ route, label, focused, onPress, badge, dot }) {
   const t = useTheme();
   const styles = useStyles();
 
@@ -46,11 +46,13 @@ function TabItem({ route, label, focused, onPress, badge }) {
           />
         </Animated.View>
         {badge ? (
-          <View style={styles.badge}>
+          <Animated.View key={badge} entering={pop()} style={styles.badge}>
             <AppText variant="small" color="#fff" style={styles.badgeText}>
               {badge > 99 ? "99+" : badge}
             </AppText>
-          </View>
+          </Animated.View>
+        ) : dot ? (
+          <Animated.View entering={pop()} style={styles.dot} />
         ) : null}
       </View>
       <AppText variant="small" color={focused ? "text" : "textMuted"} style={styles.label}>
@@ -63,7 +65,8 @@ function TabItem({ route, label, focused, onPress, badge }) {
 export default function TabBar({ state, descriptors, navigation }) {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
-  const { liked_me_count } = useEntitlements();
+  const { liked_me_count, unread_count, new_match_count } = useEntitlements();
+  const badges = { "liked-you": liked_me_count, chats: unread_count };
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
@@ -81,7 +84,9 @@ export default function TabBar({ state, descriptors, navigation }) {
             label={options.title ?? route.name}
             focused={focused}
             onPress={onPress}
-            badge={route.name === "liked-you" ? liked_me_count : 0}
+            badge={badges[route.name] ?? 0}
+            // New matches nobody has messaged yet show as a dot on Chats
+            dot={route.name === "chats" && new_match_count > 0}
           />
         );
       })}
@@ -127,6 +132,17 @@ const useStyles = makeStyles((t) => ({
     backgroundColor: t.colors.accent,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2,
+    borderColor: t.colors.surface,
+  },
+  dot: {
+    position: "absolute",
+    top: 2,
+    right: 12,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: t.colors.accent,
     borderWidth: 2,
     borderColor: t.colors.surface,
   },

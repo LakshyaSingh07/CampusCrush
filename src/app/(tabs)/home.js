@@ -10,8 +10,8 @@ import Animated, {
   useSharedValue,
 } from "react-native-reanimated";
 import MatchModal from "../../components/MatchModal";
+import { LinearGradient } from "expo-linear-gradient";
 import ProfileCard from "../../components/ProfileCard";
-import ProfileDetails from "../../components/ProfileDetails";
 import SafetyMenu from "../../components/SafetyMenu";
 import SwipeableCard from "../../components/SwipeableCard";
 import { useAuth } from "../../context/AuthProvider";
@@ -49,7 +49,6 @@ export default function HomeScreen() {
   const [loadError, setLoadError] = useState(null);
   const [match, setMatch] = useState(null);
   const [menuVisible, setMenuVisible] = useState(false);
-  const [detailsVisible, setDetailsVisible] = useState(false);
   const [undoing, setUndoing] = useState(false);
 
   const topCardRef = useRef(null);
@@ -186,8 +185,26 @@ export default function HomeScreen() {
           style={styles.card}
           onSwipe={(direction) => handleSwipe(top, direction)}
           onMorePress={() => setMenuVisible(true)}
-          onInfoPress={() => setDetailsVisible(true)}
+          scrollable
+          bottomInset={130}
         />
+        <LinearGradient colors={[t.colors.bg + "00", t.colors.bg]} style={styles.actionsFade} pointerEvents="box-none">
+          <Animated.View entering={enter(2)} style={styles.actionsRow}>
+            <IconButton
+              icon="undo"
+              size={48}
+              iconSize={17}
+              color="warning"
+              background="surface"
+              elevated
+              loading={undoing}
+              onPress={undo}
+              accessibilityLabel="Undo last swipe"
+            />
+            {actionButtons(swipeWithButton)}
+            <View style={{ width: 48 }} />
+          </Animated.View>
+        </LinearGradient>
       </>
     );
   };
@@ -255,34 +272,6 @@ export default function HomeScreen() {
       )}
 
       <View style={styles.deck}>{renderDeck()}</View>
-
-      {top && (
-        <Animated.View entering={enter(2)} style={styles.actionsRow}>
-          <IconButton
-            icon="undo"
-            size={48}
-            iconSize={17}
-            color="warning"
-            background="surface"
-            elevated
-            loading={undoing}
-            onPress={undo}
-            accessibilityLabel="Undo last swipe"
-          />
-          {actionButtons(swipeWithButton)}
-          <View style={{ width: 48 }} />
-        </Animated.View>
-      )}
-
-      <ProfileDetails
-        profile={top}
-        visible={detailsVisible && !!top}
-        onClose={() => setDetailsVisible(false)}
-        footer={actionButtons((direction) => {
-          setDetailsVisible(false);
-          swipeWithButton(direction);
-        })}
-      />
 
       {top && (
         <SafetyMenu
@@ -359,12 +348,19 @@ const useStyles = makeStyles((t) => ({
   skeletonInfo: {
     padding: 24,
   },
+  actionsFade: {
+    position: "absolute",
+    left: -t.spacing.md,
+    right: -t.spacing.md,
+    bottom: 0,
+    paddingTop: 40,
+  },
   actionsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: t.spacing.xxl,
-    paddingVertical: t.spacing.lg,
+    paddingBottom: t.spacing.md,
   },
   actions: {
     flexDirection: "row",
