@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "galgotias-dating-app",
+    "name": "CampusCrush",
     "slug": "galgotias-dating-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,7 +16,8 @@
         "foregroundImage": "./src/assets/logo.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.lakshyac99.campuscrush"
     },
     "web": {
       "bundler": "metro",
@@ -25,7 +26,14 @@
     },
     "plugins": [
       "expo-router",
-      "expo-image-picker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "CampusCrush needs access to your photos so you can add them to your profile.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -44,6 +52,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b0e5de12-de73-4ef7-8507-7f7e41d98d20"
+      }
+    },
+    "owner": "lakshyac99"
   }
 }
