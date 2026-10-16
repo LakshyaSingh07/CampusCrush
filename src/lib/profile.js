@@ -32,6 +32,7 @@ export const toPublicProfile = (profile) => ({
   religion: profile.religion,
   hometown: profile.hometown,
   prompts: profile.prompt_answers ?? [],
+  is_verified: !!profile.is_verified,
 });
 
 export const REPORT_REASONS = [

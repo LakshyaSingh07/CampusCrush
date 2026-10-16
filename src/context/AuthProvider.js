@@ -22,6 +22,9 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Set before a "forgot password" code sign-in, so the route guard sends the
+  // user to /set-password even though they already have a password
+  const [mustSetPassword, setMustSetPassword] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -58,6 +61,7 @@ export const AuthProvider = ({ children }) => {
       if (!newSession) {
         setSession(null);
         setProfile(null);
+        setMustSetPassword(false);
         return;
       }
 
@@ -110,6 +114,8 @@ export const AuthProvider = ({ children }) => {
     loading,
     user: session?.user,
     updateProfile,
+    mustSetPassword,
+    setMustSetPassword,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

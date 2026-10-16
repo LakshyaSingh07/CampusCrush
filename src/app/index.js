@@ -87,11 +87,17 @@ export default function WelcomeScreen() {
 
       <Animated.View entering={enter(5)} style={[styles.bottom, { paddingBottom: insets.bottom + 24 }]}>
         <Button
-          title="Continue with university email"
+          title="Create an account"
           icon="envelope"
           variant="dark"
-          onPress={() => router.push("/(auth)/sign-in")}
+          onPress={() => router.push({ pathname: "/(auth)/sign-in", params: { mode: "signup" } })}
           haptic="medium"
+        />
+        <Button
+          title="I already have an account"
+          variant="secondary"
+          onPress={() => router.push({ pathname: "/(auth)/sign-in", params: { mode: "login" } })}
+          style={{ marginTop: 8 }}
         />
         <AppText variant="small" color="#4A3F2A" style={[styles.center, { marginTop: 16 }]}>
           Only for verified Galgotias University students, 18+

@@ -8,6 +8,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+import { useAuth } from "../../context/AuthProvider";
 import { supabase } from "../../lib/supabase";
 import { makeStyles, useTheme } from "../../theme";
 import { AppText, Button, enter, haptics, IconButton, PressableScale, Screen, SPRING } from "../../ui";
@@ -36,7 +37,8 @@ export default function VerifyOTPScreen() {
   const router = useRouter();
   const t = useTheme();
   const styles = useStyles();
-  const { email } = useLocalSearchParams();
+  const { email, mode } = useLocalSearchParams();
+  const { setMustSetPassword } = useAuth();
   const inputRef = useRef(null);
 
   const [code, setCode] = useState("");
@@ -57,9 +59,12 @@ export default function VerifyOTPScreen() {
   const verify = async (token) => {
     setLoading(true);
     setError(null);
+    // Must be set before the session arrives so the guard opens /set-password
+    if (mode === "reset") setMustSetPassword(true);
     const { error: verifyError } = await supabase.auth.verifyOtp({ email, token, type: "email" });
     setLoading(false);
     if (verifyError) {
+      if (mode === "reset") setMustSetPassword(false);
       haptics.warning();
       setError(verifyError.message);
       setCode("");
@@ -87,7 +92,10 @@ export default function VerifyOTPScreen() {
   };
 
   const resend = async () => {
-    const { error: resendError } = await supabase.auth.signInWithOtp({ email });
+    const { error: resendError } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: mode !== "reset" },
+    });
     if (resendError) {
       setError(resendError.message);
       return;

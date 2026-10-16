@@ -58,10 +58,15 @@ export default function ProfileDetails({ profile, visible, onClose, footer }) {
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <AppText variant="h1">
-            {profile.first_name}
-            {profile.age ? <AppText variant="h2" color="textSecondary">{`  ${profile.age}`}</AppText> : null}
-          </AppText>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <AppText variant="h1">
+              {profile.first_name}
+              {profile.age ? <AppText variant="h2" color="textSecondary">{`  ${profile.age}`}</AppText> : null}
+            </AppText>
+            {profile.is_verified && (
+              <FontAwesome5 name="check-circle" size={20} color={t.colors.verified} solid accessibilityLabel="Verified" />
+            )}
+          </View>
           <IconButton icon="chevron-down" size={40} background="surfaceAlt" onPress={onClose} accessibilityLabel="Close profile" />
         </View>
 

@@ -21,16 +21,17 @@ import { useTheme } from "../theme";
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Screens a signed-in user with a complete profile should never see
-const PRE_APP_GROUPS = ["(auth)", "onboarding", "suspended"];
+const PRE_APP_GROUPS = ["(auth)", "onboarding", "suspended", "set-password"];
 
 // Single place that decides where a user is allowed to be:
 // - legal pages           → always allowed
 // - signed out            → welcome screen / (auth) screens only
 // - suspended             → the suspended screen only
+// - no password yet       → create a password (first sign-in, or forgot password)
 // - signed in, incomplete → the onboarding step they haven't finished
 // - signed in, complete   → the app (tabs, chat, edit profile, ...)
 function RootNavigator({ fontsReady }) {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, loading, mustSetPassword } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const t = useTheme();
@@ -62,6 +63,11 @@ function RootNavigator({ fontsReady }) {
       return;
     }
 
+    if (profile && (!profile.has_password || mustSetPassword)) {
+      if (group !== "set-password") router.replace("/set-password");
+      return;
+    }
+
     const nextStep = getNextOnboardingRoute(profile);
 
     if (nextStep) {
@@ -74,7 +80,7 @@ function RootNavigator({ fontsReady }) {
     if (atWelcome || PRE_APP_GROUPS.includes(group)) {
       router.replace("/(tabs)/home");
     }
-  }, [session, profile, loading, segments, router]);
+  }, [session, profile, loading, mustSetPassword, segments, router]);
 
   // Register this device for push notifications once the user is in the app
   const userId = session?.user?.id;
@@ -117,6 +123,7 @@ function RootNavigator({ fontsReady }) {
         <Stack.Screen name="edit-profile" options={{ animation: "slide_from_bottom" }} />
         <Stack.Screen name="legal/[doc]" />
         <Stack.Screen name="suspended" options={{ animation: "fade" }} />
+        <Stack.Screen name="set-password" options={{ animation: "fade", gestureEnabled: false }} />
         <Stack.Screen name="premium" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
       </Stack>
     </>

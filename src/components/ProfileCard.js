@@ -70,12 +70,17 @@ export default function ProfileCard({ profile, style, onMorePress, onInfoPress }
             </AppText>
           </View>
         )}
-        <AppText variant="h1" color="#FFFFFF" style={styles.name}>
-          {profile.first_name}
-          <AppText variant="h2" color="rgba(255,255,255,0.85)">
-            {profile.age ? `  ${profile.age}` : ""}
+        <View style={styles.nameRow}>
+          <AppText variant="h1" color="#FFFFFF" style={styles.name}>
+            {profile.first_name}
+            <AppText variant="h2" color="rgba(255,255,255,0.85)">
+              {profile.age ? `  ${profile.age}` : ""}
+            </AppText>
           </AppText>
-        </AppText>
+          {profile.is_verified && (
+            <FontAwesome5 name="check-circle" size={22} color={t.colors.verified} solid accessibilityLabel="Verified" />
+          )}
+        </View>
         {details.length > 0 && (
           <AppText variant="bodyMedium" color="rgba(255,255,255,0.9)" style={{ marginTop: 2 }}>
             {details.join("  ·  ")}
@@ -176,6 +181,11 @@ const useStyles = makeStyles((t) => ({
     paddingVertical: 4,
     paddingHorizontal: 12,
     marginBottom: 10,
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   name: {
     fontSize: 32,
