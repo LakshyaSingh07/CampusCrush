@@ -41,3 +41,6 @@ app-example
 
 # Supabase CLI cache
 supabase/.temp/
+
+# Firebase config (stored as an EAS file variable; repo is public)
+google-services.json
