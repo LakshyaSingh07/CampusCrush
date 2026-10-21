@@ -13,6 +13,8 @@ const FREE_DEFAULTS = {
   premium_plan: null,
   daily_swipe_limit: 20,
   swipes_today: 0,
+  daily_superlike_limit: 1,
+  superlikes_today: 0,
   active_matches: 0,
   match_limit: 5,
   liked_me_count: 0,
@@ -75,8 +77,10 @@ export function EntitlementsProvider({ children }) {
       ? null
       : Math.max(entitlements.daily_swipe_limit - entitlements.swipes_today, 0);
 
+  const superlikesLeft = Math.max(entitlements.daily_superlike_limit - entitlements.superlikes_today, 0);
+
   return (
-    <EntitlementsContext.Provider value={{ ...entitlements, swipesLeft, refresh }}>
+    <EntitlementsContext.Provider value={{ ...entitlements, swipesLeft, superlikesLeft, refresh }}>
       {children}
     </EntitlementsContext.Provider>
   );

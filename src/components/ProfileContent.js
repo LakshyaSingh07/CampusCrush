@@ -95,6 +95,14 @@ export default function ProfileContent({ profile, onMorePress, bottomInset = 32,
             </AppText>
           ) : null}
         </LinearGradient>
+        {profile.superliked_me && (
+          <View style={[styles.superBanner, { backgroundColor: t.colors.verified }]}>
+            <FontAwesome5 name="star" size={12} color="#FFFFFF" solid />
+            <AppText variant="caption" color="#FFFFFF">
+              {profile.first_name} SuperSwiped you
+            </AppText>
+          </View>
+        )}
         {onMorePress && (
           <IconButton
             icon="ellipsis-h"
@@ -202,6 +210,17 @@ const useStyles = makeStyles((t) => ({
   name: {
     fontSize: 32,
     lineHeight: 38,
+  },
+  superBanner: {
+    position: "absolute",
+    top: 14,
+    left: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: t.radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   more: {
     position: "absolute",

@@ -7,6 +7,7 @@ import Animated, {
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
@@ -27,11 +28,13 @@ const SwipeableCard = forwardRef(function SwipeableCard(
   ref
 ) {
   const t = useTheme();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const threshold = width * 0.28;
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const pastThreshold = useSharedValue(0);
+  // 0 → 1 while a SuperSwipe flies the card up, to show the star stamp
+  const superProgress = useSharedValue(0);
 
   useEffect(() => {
     if (dragX) dragX.value = 0;
@@ -39,6 +42,17 @@ const SwipeableCard = forwardRef(function SwipeableCard(
 
   const flyOut = (direction) => {
     "worklet";
+    if (direction === "superlike") {
+      // Show the star for a beat, then fly straight up
+      superProgress.value = withTiming(1, { duration: 180 });
+      translateY.value = withDelay(
+        220,
+        withTiming(-height * 1.2, { duration: 320 }, () => {
+          scheduleOnRN(onSwipe, direction);
+        })
+      );
+      return;
+    }
     const sign = direction === "like" ? 1 : -1;
     translateX.value = withTiming(sign * width * 1.5, { duration: 260 }, () => {
       scheduleOnRN(onSwipe, direction);
@@ -46,7 +60,8 @@ const SwipeableCard = forwardRef(function SwipeableCard(
     translateY.value = withTiming(translateY.value + 40, { duration: 260 });
   };
 
-  const swipeHaptic = (direction) => (direction === "like" ? haptics.medium() : haptics.light());
+  const swipeHaptic = (direction) =>
+    direction === "superlike" ? haptics.success() : direction === "like" ? haptics.medium() : haptics.light();
 
   useImperativeHandle(ref, () => ({
     swipe: (direction) => {
@@ -111,6 +126,10 @@ const SwipeableCard = forwardRef(function SwipeableCard(
   const passTint = useAnimatedStyle(() => ({
     opacity: interpolate(translateX.value, [-threshold * 1.5, 0], [0.25, 0], Extrapolation.CLAMP),
   }));
+  const superStyle = useAnimatedStyle(() => ({
+    opacity: superProgress.value,
+    transform: [{ scale: interpolate(superProgress.value, [0, 1], [0.5, 1]) }],
+  }));
 
   return (
     <GestureDetector gesture={pan}>
@@ -133,6 +152,11 @@ const SwipeableCard = forwardRef(function SwipeableCard(
         <Animated.View style={[styles.stamp, styles.passStamp, { borderColor: t.colors.pass }, passStyle]} pointerEvents="none">
           <AppText variant="h1" color={t.colors.pass} style={styles.stampText}>
             NOPE
+          </AppText>
+        </Animated.View>
+        <Animated.View style={[styles.superStamp, { backgroundColor: t.colors.verified }, superStyle]} pointerEvents="none">
+          <AppText variant="h1" color="#FFFFFF" style={styles.stampText}>
+            ⭐ SUPER
           </AppText>
         </Animated.View>
       </Animated.View>
@@ -165,6 +189,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 2,
     backgroundColor: "rgba(0,0,0,0.15)",
+  },
+  superStamp: {
+    position: "absolute",
+    top: 140,
+    alignSelf: "center",
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 4,
   },
   likeStamp: {
     left: 26,

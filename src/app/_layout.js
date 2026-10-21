@@ -102,6 +102,9 @@ function RootNavigator({ fontsReady }) {
         first_name: data.name,
         photos: data.photo ? [data.photo] : [],
       });
+    } else if (data.type === "superlike") {
+      // The SuperSwiper is shown first on Discover
+      router.navigate("/(tabs)/home");
     }
   }, [notificationResponse, onboardingDone, router]);
 
@@ -125,6 +128,7 @@ function RootNavigator({ fontsReady }) {
         <Stack.Screen name="suspended" options={{ animation: "fade" }} />
         <Stack.Screen name="set-password" options={{ animation: "fade", gestureEnabled: false }} />
         <Stack.Screen name="premium" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+        <Stack.Screen name="filters" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
       </Stack>
     </>
   );

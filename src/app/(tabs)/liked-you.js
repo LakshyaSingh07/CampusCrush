@@ -169,6 +169,14 @@ export default function LikedYouScreen() {
           <Animated.View entering={enter(index)} style={styles.tileWrap}>
             <PressableScale style={styles.tile} onPress={() => setSelected(item)} haptic="light" scaleTo={0.96}>
               <Image source={{ uri: resizedImageUrl(item.photos?.[0], 400) }} style={{ flex: 1 }} contentFit="cover" transition={200} />
+              {item.superliked_me && (
+                <View style={[styles.superBadge, { backgroundColor: t.colors.verified }]}>
+                  <FontAwesome5 name="star" size={10} color="#FFFFFF" solid />
+                  <AppText variant="small" color="#FFFFFF">
+                    SuperSwipe
+                  </AppText>
+                </View>
+              )}
               <LinearGradient colors={t.gradients.photoFade} style={styles.tileInfo}>
                 <AppText variant="title" color="#FFFFFF">
                   {item.first_name}, {item.age}
@@ -292,6 +300,17 @@ const useStyles = makeStyles((t) => ({
     borderRadius: t.radius.lg,
     overflow: "hidden",
     backgroundColor: t.colors.surfaceAlt,
+  },
+  superBadge: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: t.radius.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
   tileInfo: {
     position: "absolute",

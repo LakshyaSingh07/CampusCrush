@@ -17,7 +17,7 @@ import SwipeableCard from "../../components/SwipeableCard";
 import { useAuth } from "../../context/AuthProvider";
 import { useEntitlements } from "../../context/EntitlementsProvider";
 import { openChat } from "../../lib/navigation";
-import { LIMIT_ERRORS } from "../../lib/premium";
+import { hasActiveFilters, LIMIT_ERRORS } from "../../lib/premium";
 import { supabase } from "../../lib/supabase";
 import { makeStyles, useTheme } from "../../theme";
 import { AppText, EmptyState, enter, IconButton, PressableScale, Screen, Skeleton } from "../../ui";
@@ -43,7 +43,9 @@ export default function HomeScreen() {
   const styles = useStyles();
   const { width } = useWindowDimensions();
   const { profile: myProfile } = useAuth();
-  const { is_premium, swipesLeft, refresh: refreshEntitlements } = useEntitlements();
+  const { is_premium, swipesLeft, superlikesLeft, refresh: refreshEntitlements } = useEntitlements();
+  const filtersKey = JSON.stringify(myProfile?.discovery_filters ?? {});
+  const filtersActive = hasActiveFilters(myProfile?.discovery_filters);
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -69,9 +71,10 @@ export default function HomeScreen() {
     setLoading(false);
   }, []);
 
+  // Reload whenever the filters change (and on first load)
   useEffect(() => {
     loadFeed();
-  }, [loadFeed]);
+  }, [loadFeed, filtersKey]);
 
   // Fetch the next page when the deck runs out
   useEffect(() => {
@@ -112,6 +115,7 @@ export default function HomeScreen() {
   // Buttons check the daily limit before animating; drags are checked by the server
   const swipeWithButton = (direction) => {
     if (swipesLeft === 0) return openPaywall("swipes");
+    if (direction === "superlike" && superlikesLeft === 0) return openPaywall("superlikes");
     topCardRef.current?.swipe(direction);
   };
 
@@ -202,7 +206,6 @@ export default function HomeScreen() {
               accessibilityLabel="Undo last swipe"
             />
             {actionButtons(swipeWithButton)}
-            <View style={{ width: 48 }} />
           </Animated.View>
         </LinearGradient>
       </>
@@ -213,18 +216,36 @@ export default function HomeScreen() {
     <View style={styles.actions}>
       <IconButton
         icon="times"
-        size={64}
-        iconSize={26}
+        size={60}
+        iconSize={24}
         color="pass"
         background="surface"
         elevated
         onPress={() => onAction("pass")}
         accessibilityLabel="Pass"
       />
+      <View>
+        <IconButton
+          icon="star"
+          size={52}
+          iconSize={20}
+          color="#FFFFFF"
+          background="verified"
+          elevated
+          haptic="medium"
+          onPress={() => onAction("superlike")}
+          accessibilityLabel={`SuperSwipe, ${superlikesLeft} left today`}
+        />
+        <View style={styles.superCount} pointerEvents="none">
+          <AppText variant="small" color="verified" style={{ fontSize: 11 }}>
+            {superlikesLeft}
+          </AppText>
+        </View>
+      </View>
       <IconButton
         icon="heart"
-        size={72}
-        iconSize={30}
+        size={66}
+        iconSize={28}
         color="onPrimary"
         background="primary"
         elevated
@@ -241,6 +262,19 @@ export default function HomeScreen() {
         <AppText variant="h1" style={styles.logo}>
           campus<AppText variant="h1" color="primaryPressed">crush</AppText>
         </AppText>
+        <View style={{ flex: 1 }} />
+        <View style={{ marginRight: 10 }}>
+          <IconButton
+            icon="sliders-h"
+            size={38}
+            iconSize={15}
+            background="surface"
+            elevated
+            onPress={() => router.push("/filters")}
+            accessibilityLabel={filtersActive ? "Filters (on)" : "Filters"}
+          />
+          {filtersActive && <View style={styles.filterDot} pointerEvents="none" />}
+        </View>
         {is_premium ? (
           <View style={[styles.pill, styles.premiumPill]}>
             <FontAwesome5 name="crown" size={11} color={t.colors.onPrimary} />
@@ -348,6 +382,31 @@ const useStyles = makeStyles((t) => ({
   skeletonInfo: {
     padding: 24,
   },
+  filterDot: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: t.colors.accent,
+    borderWidth: 2,
+    borderColor: t.colors.bg,
+  },
+  superCount: {
+    position: "absolute",
+    right: -4,
+    top: -4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    backgroundColor: t.colors.surface,
+    borderWidth: 2,
+    borderColor: t.colors.verified,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   actionsFade: {
     position: "absolute",
     left: -t.spacing.md,
@@ -357,16 +416,16 @@ const useStyles = makeStyles((t) => ({
   },
   actionsRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: t.spacing.xxl,
+    gap: t.spacing.lg,
     paddingBottom: t.spacing.md,
   },
   actions: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: t.spacing.xxl,
+    gap: t.spacing.lg,
     paddingVertical: t.spacing.sm,
   },
   undoLink: {
